@@ -1,6 +1,6 @@
 # Keeps rolling the day/night cycle on a bench, for shiny resets.
-# Before you start: walk up to the bench you want to use until you're blocked,
-# turn around, then run the macro.
+# Before you start: walk up to the bench you want to use until you're blocked.
+# Then just run the macro
 LOOP FOREVER
     L_STICK@+000-100 0.066s
     0.28s
