@@ -804,3 +804,23 @@ Alert Dialog
         grid-template-columns: 1fr;
     }
 }
+
+.library-record {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.library-record button {
+    margin: 0;
+}
+
+.library-record input {
+    padding: 0.5rem;
+    color: #1a1f28;
+}
+
+#record-button.recording {
+    background-color: #ff8a80;
+}

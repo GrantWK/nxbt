@@ -171,6 +171,10 @@
                                 <button id="library-delete-button" onclick="deleteLibraryMacro()" disabled>Delete</button>
                                 <button onclick="newLibraryMacro()">New</button>
                             </div>
+                            <div class="library-record">
+                                <button id="record-button" onclick="toggleRecording()">&#9679; Record</button>
+                                <input id="record-repeat" type="text" placeholder="Repeat: blank = once, 10, 30m or forever" aria-label="Repeat" onfocus="disableKeyHandlers()" onblur="enableKeyHandlers()">
+                            </div>
                             <p id="library-message" role="status"></p>
                         </div>
                     </div>

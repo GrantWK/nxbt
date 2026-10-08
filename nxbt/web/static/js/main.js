@@ -708,6 +708,7 @@ function eventLoop() {
     if (JSON.stringify(INPUT_PACKET) !== JSON.stringify(INPUT_PACKET_OLD)) {
         socket.emit('input', JSON.stringify([NXBT_CONTROLLER_INDEX, INPUT_PACKET]));
         INPUT_PACKET_OLD = JSON.parse(JSON.stringify(INPUT_PACKET));
+        recordInput(INPUT_PACKET);
     }
 
     updateGamepadDisplay()
@@ -998,4 +999,103 @@ function newLibraryMacro() {
     HTML_LIBRARY_INFO.replaceChildren();
     HTML_LIBRARY_DELETE.disabled = true;
     setLibraryMessage("");
+}
+
+/**********************************************/
+/* Recording */
+/**********************************************/
+
+let RECORDING = null;
+const HTML_RECORD_BUTTON = document.getElementById("record-button");
+const HTML_RECORD_REPEAT = document.getElementById("record-repeat");
+
+socket.on('recorded_macro', function(text) {
+    LIBRARY_MACRO = null;
+    renderLibrary();
+    HTML_LIBRARY_NAME.value = "";
+    HTML_LIBRARY_TEXT.value = text;
+    HTML_LIBRARY_INFO.replaceChildren();
+    HTML_LIBRARY_DELETE.disabled = true;
+    setLibraryMessage("Recorded. Fill in the description, name it and press Save.");
+});
+
+function toggleRecording() {
+    // Keep keyboard input (e.g. Enter) from pressing the button while playing
+    HTML_RECORD_BUTTON.blur();
+    if (!RECORDING) {
+        if (NXBT_CONTROLLER_INDEX === false) {
+            setLibraryMessage("Connect a controller first.", true);
+            return;
+        }
+        RECORDING = {
+            start: performance.now(),
+            samples: [[0, JSON.parse(JSON.stringify(INPUT_PACKET))]],
+        };
+        HTML_RECORD_BUTTON.textContent = "\u25A0 Stop recording";
+        HTML_RECORD_BUTTON.classList.add("recording");
+        setLibraryMessage("Recording: play with your keyboard or gamepad. Inputs still reach the Switch.");
+        return;
+    }
+    socket.emit('recording_to_macro', JSON.stringify({
+        samples: RECORDING.samples,
+        end: performance.now() - RECORDING.start,
+        repeat: HTML_RECORD_REPEAT.value,
+    }));
+    RECORDING = null;
+    HTML_RECORD_BUTTON.textContent = "\u25CF Record";
+    HTML_RECORD_BUTTON.classList.remove("recording");
+}
+
+function recordInput(packet) {
+    if (RECORDING) {
+        RECORDING.samples.push([performance.now() - RECORDING.start, JSON.parse(JSON.stringify(packet))]);
+    }
+}
+
+/**********************************************/
+/* Macro editors: Tab indents */
+/**********************************************/
+
+const INDENT = "    ";
+
+function replaceRange(area, start, end, text) {
+    area.setSelectionRange(start, end);
+    // insertText keeps the browser's undo history; setRangeText is the fallback
+    if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+        area.setRangeText(text, start, end, "end");
+    }
+}
+
+function handleEditorKeys(evt) {
+    let area = evt.target;
+    if (evt.key === "Escape") {
+        area.blur();  // lets keyboard users Tab out of the editor
+        return;
+    }
+    if (evt.key !== "Tab") {
+        return;
+    }
+    evt.preventDefault();
+    let start = area.selectionStart;
+    let end = area.selectionEnd;
+    if (!evt.shiftKey && start === end) {
+        replaceRange(area, start, end, INDENT);
+        return;
+    }
+    // Indent (Tab) or unindent (Shift+Tab) every line the selection touches
+    let lineStart = area.value.lastIndexOf("\n", start - 1) + 1;
+    let lines = area.value.slice(lineStart, end).split("\n");
+    let changed = lines
+        .map(line => evt.shiftKey ? line.replace(/^( {1,4}|\t)/, "") : INDENT + line)
+        .join("\n");
+    replaceRange(area, lineStart, end, changed);
+    if (start === end) {
+        area.setSelectionRange(lineStart + changed.length, lineStart + changed.length);
+    } else {
+        area.setSelectionRange(lineStart, lineStart + changed.length);
+    }
+}
+
+for (let id of ["macro-text", "library-text"]) {
+    document.getElementById(id).addEventListener("keydown", handleEditorKeys);
 }

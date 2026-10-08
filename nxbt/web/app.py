@@ -21,6 +21,7 @@ from ..utils import load_file
 from ..nxbt import Nxbt, PRO_CONTROLLER
 from ..backends import BACKENDS
 from ..library import Library
+from ..controller.recording import recording_to_macro
 from ..setcap import GRANT_CAPS_HINT
 
 # Polling payloads can batch many input packets; default limit (16) is too low.
@@ -111,6 +112,7 @@ class WebApp:
         self.sio.on("library_get")(self.handle_library_get)
         self.sio.on("library_save")(self.handle_library_save)
         self.sio.on("library_delete")(self.handle_library_delete)
+        self.sio.on("recording_to_macro")(self.handle_recording_to_macro)
 
     def _run_async(self, coro, *, wait=True):
         """Run a coroutine from sync Socket.IO handlers."""
@@ -277,6 +279,17 @@ class WebApp:
             self._emit_to(sid, "library_error", str(e))
             return
         self._emit_to(sid, "library", self.library.list())
+
+    def handle_recording_to_macro(self, sid, message):
+        recording = json.loads(message)
+        try:
+            text = recording_to_macro(
+                recording.get("samples"), recording.get("end", 0), recording.get("repeat", "")
+            )
+        except (ValueError, TypeError, IndexError, KeyError) as e:
+            self._emit_to(sid, "library_error", str(e))
+            return
+        self._emit_to(sid, "recorded_macro", text)
 
     def app_for(self, ip):
         """The ASGI app to serve when bound to `ip`."""

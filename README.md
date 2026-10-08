@@ -22,7 +22,8 @@ wired-microcontroller project.
 - [x] Fix the controller loop's timing and busy-waits
 - [x] Web UI: tabs, live macro status, macro Library
 - [x] Infinite and timed macro loops (`LOOP FOREVER`, `LOOP 30m`)
-- [ ] Web UI: record macros, editable key mapping
+- [x] Web UI: record macros from live input
+- [ ] Web UI: editable key mapping
 - [ ] Tests for the controller core
 - [ ] Computer vision experiments
 
@@ -65,7 +66,8 @@ has paired with before. Then:
   input is sampled.
 - **Macros**: type a macro and run it.
 - **Library**: macros grouped by game, each with what it does and where to
-  start it. Run, edit and save your own; they're stored in
+  start it. Run, edit and save your own, or **Record** what you play and save
+  it as a macro (optionally repeated). Yours are stored in
   `~/.local/share/nxbt/library/`.
 - **Mapping**: the keyboard controls.
 - **Controller**: shut down, recreate or restart the emulated controller.
