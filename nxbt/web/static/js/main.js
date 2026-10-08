@@ -759,7 +759,8 @@ function updateMacroStatus() {
         HTML_MACRO_STATUS_TEXT.textContent = "Idle";
         return;
     }
-    let text = `Running ${status.id.slice(0, 6)} · step: ${status.step || "-"} · ${status.steps_left} steps left`;
+    let progress = status.steps_left === null ? "repeats until stopped" : `${status.steps_left} steps left`;
+    let text = `Running ${status.id.slice(0, 6)} · step: ${status.step || "-"} · ${progress}`;
     if (status.queued) {
         text += ` · ${status.queued} queued`;
     }

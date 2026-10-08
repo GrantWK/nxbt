@@ -9,6 +9,10 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Added
+- `LOOP FOREVER` repeats a macro block until stopped. Loops are no longer
+  expanded in memory: `LOOP 100000` of a 14-line block used 22 MB and cost
+  ~0.15 ms per step; it now uses a few KB and ~0.2 µs per step. A macro with
+  an invalid LOOP line is skipped instead of crashing the controller.
 - Web UI: controller page split into Input, Macros, Mapping and Controller
   tabs, with a macro status strip (current step, steps left, Stop, Clear all)
   that stays visible while scrolling and switching tabs.

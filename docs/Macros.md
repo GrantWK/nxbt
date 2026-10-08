@@ -79,6 +79,15 @@ LOOP 100
         0.1s
 ```
 
+`LOOP FOREVER` repeats its block until the macro is stopped (for example with
+the web app's Stop button).
+
+```
+LOOP FOREVER
+    A 0.4s
+    0.05s
+```
+
 Note, a macro line starting with `#` is ignored.
 
 ### Library macros
@@ -91,7 +100,7 @@ lines describing it; the Library shows them:
 # Mashes A until stopped.
 # Before you start: be where A should be pressed. Waits 5 s first.
 5s
-LOOP 100000
+LOOP FOREVER
     A 0.4s
     0.05s
 ```

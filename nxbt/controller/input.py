@@ -1,5 +1,8 @@
+import logging
 from time import perf_counter
 from json import dumps
+
+from .macro import parse_macro
 
 
 DIRECT_INPUT_IDLE_PACKET = {
@@ -196,14 +199,19 @@ class InputParser:
 
             # Check if we can start on a new macro.
             if not self.current_macro and self.macro_buffer:
-                # Preprocess command lines of current macro
-                macro = self.macro_buffer.pop(0)
-                self.current_macro = self.parse_macro(macro[0])
-                self.current_macro_id = macro[1]
+                macro, macro_id = self.macro_buffer.pop(0)
+                try:
+                    self.current_macro = parse_macro(macro)
+                    self.current_macro_id = macro_id
+                except ValueError as e:
+                    # Skip the macro instead of crashing the controller
+                    logging.getLogger("nxbt").warning(f"Skipping macro: {e}")
+                    if state:
+                        state["finished_macros"] = state["finished_macros"] + [macro_id]
 
             # Load the next step in the same tick the previous one ended
             if not self.current_macro_commands and self.current_macro:
-                self.load_step(self.current_macro.pop(0).strip(" ").split(" "), step_start)
+                self.load_step(self.current_macro.pop().strip(" ").split(" "), step_start)
 
             if self.current_macro_commands:
                 self.set_macro_input(self.current_macro_commands)
@@ -224,7 +232,8 @@ class InputParser:
         return {
             "id": self.current_macro_id,
             "step": " ".join(self.current_macro_commands or []),
-            "steps_left": len(self.current_macro or []),
+            # None means the macro repeats until stopped (LOOP FOREVER)
+            "steps_left": self.current_macro.remaining if self.current_macro else 0,
             "queued": len(self.macro_buffer),
         }
 
@@ -316,57 +325,6 @@ class InputParser:
         self.protocol.set_right_stick_inputs(stick_right)
 
         return controller_input
-
-    def parse_macro(self, macro):
-        parsed = macro.split("\n")
-        parsed = list(filter(lambda s: not s.strip() == "", parsed))
-        parsed = list(filter(lambda s: not s.strip().startswith("#"), parsed))
-        parsed = self.parse_loops(parsed)
-
-        return parsed
-
-    def parse_loops(self, macro):
-        parsed = []
-        i = 0
-        while i < len(macro):
-            line = macro[i]
-            if line.startswith("LOOP"):
-                loop_count = int(line.split(" ")[1])
-                loop_buffer = []
-
-                # Detect delimiter and record
-                if macro[i + 1].startswith("\t"):
-                    loop_delimiter = "\t"
-                elif macro[i + 1].startswith("    "):
-                    loop_delimiter = "    "
-                else:
-                    loop_delimiter = "  "
-
-                # Gather looping commands
-                for j in range(i + 1, len(macro)):
-                    loop_line = macro[j]
-                    if loop_line.startswith(loop_delimiter):
-                        # Replace the first instance of the delimiter
-                        loop_line = loop_line.replace(loop_delimiter, "", 1)
-                        loop_buffer.append(loop_line)
-                    # Set the new position if we either encounter the end
-                    # of the loop or we reach the end of the macro
-                    else:
-                        i = j - 1
-                        break
-                    if j + 1 >= len(macro):
-                        i = j
-
-                # Recursively gather other loops if present
-                if any(s.startswith("LOOP") for s in loop_buffer):
-                    loop_buffer = self.parse_loops(loop_buffer)
-                # Multiply out the loop and concatenate
-                parsed = parsed + (loop_buffer * loop_count)
-            else:
-                parsed.append(line)
-            i += 1
-
-        return parsed
 
     def set_macro_input(self, macro_input):
         # Checking if this is a wait macro command
