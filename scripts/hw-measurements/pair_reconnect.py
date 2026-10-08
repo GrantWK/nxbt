@@ -39,13 +39,13 @@ def main():
             result["switch_address"] = nx.state[idx]["last_connection"]
             print(f"Connected to {result['switch_address']}. Now sleep the Switch, wait, wake it. Ctrl+C to finish.")
             poll_state(nx, idx, timeout=args.watch, log=log)
-        elif final == "crashed":
-            result["errors"] = nx.state[idx]["errors"]
-            print(result["errors"])
     except KeyboardInterrupt:
         print("\nstopping...")
     finally:
         result["state_log"] = log
+        if log and log[-1][1] == "crashed":
+            result["errors"] = nx.state[idx]["errors"]
+            print(result["errors"])
         if idx is not None:
             try:
                 nx.remove_controller(idx)
