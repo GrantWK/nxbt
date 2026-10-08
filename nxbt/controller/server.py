@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, wait
 from multiprocessing import Event
+import contextlib
 import signal
 import time
 import queue
@@ -8,12 +9,17 @@ import traceback
 import statistics as stat
 
 from ..backends import BACKENDS
+from ..backends.base import PairingRequired
 from ..logger import create_logger
 
 from .controller import ControllerTypes
 from .protocol import ControllerProtocol
 from .input import InputParser
 from .utils import format_msg_controller, format_msg_switch
+
+# Backoff between reconnect attempts while the Switch is unreachable
+RECONNECT_MIN_DELAY = 0.5
+RECONNECT_MAX_DELAY = 5.0
 
 
 class ControllerServer:
@@ -45,10 +51,7 @@ class ControllerServer:
         self.colour_body = colour_body
         self.colour_buttons = colour_buttons
 
-        if lock:
-            self.lock = lock
-
-        self.reconnect_counter = 0
+        self.lock = lock
 
         # Initializing Bluetooth
         self.backend = backend
@@ -262,34 +265,52 @@ class ControllerServer:
                 time.sleep(1 / 15)
 
     def save_connection(self):
-        while self.reconnect_counter < 2:
+        """Restores a dropped connection. Retries with growing delays while the
+        Switch is unreachable (e.g. asleep) and only re-pairs when the Switch
+        rejects this controller's bond.
+
+        :return: (itr, ctrl), or (None, None) if the controller is being removed
+        """
+        delay = RECONNECT_MIN_DELAY
+        while self.is_running():
+            self._reset_protocol()
             try:
-                self.logger.debug("Attempting to reconnect")
-                self.protocol = ControllerProtocol(
-                    self.controller_type,
-                    self.backend.address,
-                    colour_body=self.colour_body,
-                    colour_buttons=self.colour_buttons,
-                )
-                self.input.reassign_protocol(self.protocol)
-                if self.lock:
-                    self.lock.acquire()
-                try:
+                with self._bluetooth_lock():
                     itr, ctrl = self.reconnect(self.switch_address)
-                    self.state["state"] = "connected"
-                    return itr, ctrl
-                finally:
-                    if self.lock:
-                        self.lock.release()
-            except OSError as e:
-                self.reconnect_counter += 1
+                self.state["state"] = "connected"
+                return itr, ctrl
+            except PairingRequired as e:
                 self.logger.debug(e)
-                time.sleep(0.5)
+                return self._repair()
+            except OSError as e:
+                self.logger.debug(f"Reconnect failed, retrying in {delay:.1f}s: {e}")
+                self._wait(delay)
+                delay = min(delay * 2, RECONNECT_MAX_DELAY)
+        return None, None
 
+    def _repair(self):
+        """Waits in pairing mode until a Switch pairs, or the controller is removed."""
         self.logger.debug("Connecting to any Switch")
-        self.reconnect_counter = 0
         self.tick = 1
+        while self.is_running():
+            self._reset_protocol()
+            # Press the buttons the Change Grip/Order menu asks for
+            if self.controller_type == ControllerTypes.PRO_CONTROLLER:
+                self.input.current_macro_commands = ["L", "R", "0.0s"]
+            elif self.controller_type == ControllerTypes.JOYCON_L:
+                self.input.current_macro_commands = ["JCL_SL", "JCL_SR", "0.0s"]
+            elif self.controller_type == ControllerTypes.JOYCON_R:
+                self.input.current_macro_commands = ["JCR_SL", "JCR_SR", "0.0s"]
+            with self._bluetooth_lock():
+                itr, ctrl = self.pair()
+            if itr:
+                self.state["state"] = "connected"
+                self.switch_address = itr.getpeername()[0].replace("/P", "")
+                return itr, ctrl
+            self._wait(RECONNECT_MIN_DELAY)
+        return None, None
 
+    def _reset_protocol(self):
         self.protocol = ControllerProtocol(
             self.controller_type,
             self.backend.address,
@@ -298,36 +319,23 @@ class ControllerServer:
         )
         self.input.reassign_protocol(self.protocol)
 
-        if self.controller_type == ControllerTypes.PRO_CONTROLLER:
-            self.input.current_macro_commands = "L R 0.0s".strip(" ").split(" ")
-        elif self.controller_type == ControllerTypes.JOYCON_L:
-            self.input.current_macro_commands = "JCL_SL JCL_SR 0.0s".strip(" ").split(
-                " "
-            )
-        elif self.controller_type == ControllerTypes.JOYCON_R:
-            self.input.current_macro_commands = "JCR_SL JCR_SR 0.0s".strip(" ").split(
-                " "
-            )
+    def _bluetooth_lock(self):
+        return self.lock if self.lock else contextlib.nullcontext()
 
-        if self.lock:
-            self.lock.acquire()
-        try:
-            itr, ctrl = self.pair()
-        finally:
-            if self.lock:
-                self.lock.release()
-
-        self.state["state"] = "connected"
-        self.switch_address = itr.getsockname()[0]
-
-        return itr, ctrl
+    def _wait(self, seconds):
+        """Sleeps up to `seconds`, returning early if the controller is removed."""
+        end = time.monotonic() + seconds
+        while time.monotonic() < end and self.is_running():
+            time.sleep(0.1)
 
     def pair(self):
         """Listens for and pairs with an incoming Nintendo Switch connection."""
         try:
             self.state["state"] = "connecting"
             self.logger.debug("Waiting for incoming HID connections...")
-            itr, ctrl = self.run_with_check(self.backend.accept)
+            itr, ctrl = self.run_with_check(self.backend.accept) or (None, None)
+            if not itr:
+                return None, None
             self.logger.debug(f"Accepted connection from {itr.getpeername()[0]}")
             itr.setblocking(False)
             self.protocol.process_commands(None)
@@ -345,6 +353,9 @@ class ControllerServer:
         :type reconnect_address: string or list
         """
         self.state["state"] = "reconnecting"
-        itr, ctrl = self.run_with_check(self.backend.reconnect, reconnect_address)
+        result = self.run_with_check(self.backend.reconnect, reconnect_address)
+        if result is None:
+            raise OSError("Controller removed while reconnecting")
+        itr, ctrl = result
         itr.setblocking(False)
         return itr, ctrl

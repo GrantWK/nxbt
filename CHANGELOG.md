@@ -17,6 +17,12 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- A controller no longer crashes when the Switch sleeps longer than the
+  reconnect attempts (`PSM already in use`). It now keeps retrying with a
+  growing delay (up to 5 s) until the Switch wakes, and only re-pairs when
+  the Switch rejects the bond. Also fixes crashes on unhandled reconnect
+  errors, a pairing timeout, and controller removal mid-reconnect, and a
+  re-pair saving nxbt's own address instead of the Switch's.
 - Running nxbt as root no longer rewrites the `bluetoothd` systemd override
   and restarts `bluetoothd` regardless of backend. That disconnected other
   Bluetooth devices and left `bluetoothd` running without plugins until

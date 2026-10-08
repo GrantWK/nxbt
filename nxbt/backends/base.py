@@ -7,6 +7,10 @@ class AdapterAvailability(TypedDict):
     has_permissions: bool
 
 
+class PairingRequired(OSError):
+    """The Switch rejected this controller's bond; it must pair again."""
+
+
 class Backend(ABC):
     """Abstract base class for Bluetooth backends.
 
