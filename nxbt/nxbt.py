@@ -15,6 +15,7 @@ import sys
 from .controller import ControllerServer
 from .controller import ControllerTypes
 from .logger import create_logger
+from .power import SleepInhibitor
 
 
 JOYCON_L = ControllerTypes.JOYCON_L
@@ -188,6 +189,8 @@ class Nxbt:
         self._controller_counter = 0
         self._adapters_in_use = {}
         self._controller_adapter_lookup = {}
+        # Blocks PC suspend while any controller exists
+        self._sleep_inhibitor = SleepInhibitor()
         self._stop_event = self.resource_manager.Event()
 
         # Exit handler
@@ -223,6 +226,8 @@ class Nxbt:
         ensure no zombie processes linger after exit.
         """
         try:
+            if hasattr(self, "_sleep_inhibitor"):
+                self._sleep_inhibitor.release()
             if hasattr(self, "controllers") and self.controllers.is_alive():
                 self._stop_event.set()
                 self.controllers.join(5)
@@ -645,7 +650,12 @@ class Nxbt:
         finally:
             self._controller_lock.release()
 
+        self._sleep_inhibitor.acquire()
         return controller_index
+
+    def _allow_sleep_if_idle(self):
+        if not self._controller_adapter_lookup:
+            self._sleep_inhibitor.release()
 
     def remove_controller(self, controller_index):
         """Terminates and removes a given controller.
@@ -665,6 +675,7 @@ class Nxbt:
                     self._adapters_in_use.pop(adapter_path, None)
                 except Exception:
                     pass
+                self._allow_sleep_if_idle()
             raise ValueError("Specified controller does not exist")
 
         self._controller_lock.acquire()
@@ -673,6 +684,7 @@ class Nxbt:
             self._adapters_in_use.pop(adapter_path, None)
         finally:
             self._controller_lock.release()
+        self._allow_sleep_if_idle()
 
         self.task_queue.put(
             {

@@ -72,6 +72,11 @@ has paired with before. Then:
 - **Mapping**: the keyboard controls.
 - **Controller**: shut down, recreate or restart the emulated controller.
 
+While nxbt has a controller it keeps the computer from suspending (suspend
+would drop the Bluetooth link). The screen can still blank and lock; macros keep
+running. This uses `systemd-inhibit`; check it with
+`systemd-inhibit --list | grep nxbt`.
+
 Macros are plain text: buttons and sticks held for a time, plus `LOOP <count>`,
 `LOOP <time>` (e.g. `LOOP 30m`) and `LOOP FOREVER`. See
 [docs/Macros.md](docs/Macros.md).
