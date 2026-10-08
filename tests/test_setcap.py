@@ -1,7 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 from nxbt.setcap import (
+    CAP_NET_ADMIN,
+    CAP_NET_BIND_SERVICE,
     GRANT_CAPS_HINT,
+    get_effective_caps,
     has_bluez_caps,
     has_cap_net_admin,
 )
@@ -13,14 +16,22 @@ def test_grant_caps_hint_message():
     )
 
 
+def test_get_effective_caps_parses_proc_status():
+    status = "Name:\tpython\nCapEff:\t0000000000001400\n"
+    with patch("builtins.open", mock_open(read_data=status)):
+        assert get_effective_caps() == 0x1400
+
+
+def test_get_effective_caps_without_proc():
+    with patch("builtins.open", side_effect=FileNotFoundError):
+        assert get_effective_caps() == 0
+
+
 def test_has_cap_net_admin():
-    with patch(
-        "nxbt.setcap.get_executable_caps",
-        return_value="cap_net_admin=eip",
-    ):
+    with patch("nxbt.setcap.get_effective_caps", return_value=1 << CAP_NET_ADMIN):
         assert has_cap_net_admin() is True
 
-    with patch("nxbt.setcap.get_executable_caps", return_value=None):
+    with patch("nxbt.setcap.get_effective_caps", return_value=0):
         assert has_cap_net_admin() is False
 
 
@@ -52,16 +63,11 @@ def test_bumble_get_available_adapters_without_permissions():
 
 
 def test_has_bluez_caps():
-    with patch(
-        "nxbt.setcap.get_executable_caps",
-        return_value="cap_net_admin,cap_net_bind_service=eip",
-    ):
+    both = (1 << CAP_NET_ADMIN) | (1 << CAP_NET_BIND_SERVICE)
+    with patch("nxbt.setcap.get_effective_caps", return_value=both):
         assert has_bluez_caps() is True
 
-    with patch(
-        "nxbt.setcap.get_executable_caps",
-        return_value="cap_net_admin=eip",
-    ):
+    with patch("nxbt.setcap.get_effective_caps", return_value=1 << CAP_NET_ADMIN):
         assert has_bluez_caps() is False
 
 

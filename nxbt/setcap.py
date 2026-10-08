@@ -6,10 +6,6 @@ if ctypes.util.find_library("cap"):
     libcap = ctypes.CDLL(ctypes.util.find_library("cap"), use_errno=True)
     libcap.cap_from_text.argtypes = [ctypes.c_char_p]
     libcap.cap_from_text.restype = ctypes.c_void_p
-    libcap.cap_get_file.argtypes = [ctypes.c_char_p]
-    libcap.cap_get_file.restype = ctypes.c_void_p
-    libcap.cap_to_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
-    libcap.cap_to_text.restype = ctypes.c_char_p
     libcap.cap_set_file.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
     libcap.cap_set_file.restype = ctypes.c_int
     libcap.cap_free.argtypes = [ctypes.c_void_p]
@@ -17,41 +13,41 @@ if ctypes.util.find_library("cap"):
 else:
     libcap = None
 
+# Bit positions from linux/capability.h
+CAP_NET_BIND_SERVICE = 10
+CAP_NET_ADMIN = 12
+
 GRANT_CAPS_HINT = 'Run `sudo env HOME="$HOME" nxbt` first to grant permissions.'
 
 
-def get_file_cap(path: str) -> str | None:
-    if not libcap:
-        return None
-    cap = libcap.cap_get_file(os.fsencode(path))
-    if not cap:
-        return None
+def get_effective_caps() -> int:
+    """Returns the effective capability bitmask of this process, or 0 if unknown.
+
+    This covers every way nxbt can be privileged: running as root, ambient
+    capabilities from a service manager, Docker --cap-add, or file
+    capabilities on a compiled binary.
+    """
     try:
-        text = libcap.cap_to_text(cap, None)
-        return text.decode() if text else None
-    finally:
-        libcap.cap_free(cap)
+        with open("/proc/self/status", encoding="ascii") as f:
+            for line in f:
+                if line.startswith("CapEff:"):
+                    return int(line.split()[1], 16)
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
 
 
-def get_executable_caps() -> str | None:
-    try:
-        return get_file_cap(os.readlink("/proc/self/exe"))
-    except (OSError, AttributeError):
-        return None
-
-
-def _caps_include(cap_text: str | None, *caps: str) -> bool:
-    if not cap_text:
-        return False
-    return all(cap in cap_text for cap in caps)
+def _has_caps(*caps: int) -> bool:
+    mask = get_effective_caps()
+    return all(mask & (1 << cap) for cap in caps)
 
 
 def has_cap_net_admin() -> bool:
-    return _caps_include(get_executable_caps(), "cap_net_admin")
+    return _has_caps(CAP_NET_ADMIN)
 
 
 def has_bluez_caps() -> bool:
-    return _caps_include(get_executable_caps(), "cap_net_admin", "cap_net_bind_service")
+    return _has_caps(CAP_NET_ADMIN, CAP_NET_BIND_SERVICE)
 
 
 def set_file_cap(path: str, spec: str) -> None:
