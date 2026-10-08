@@ -13,11 +13,24 @@ if ctypes.util.find_library("cap"):
 else:
     libcap = None
 
+# Nuitka defines __compiled__ in every compiled module. Only a compiled nxbt
+# binary may receive file capabilities: anywhere else /proc/self/exe is the
+# shared Python interpreter, and granting it capabilities would hand them to
+# every Python script on the system.
+IS_COMPILED = "__compiled__" in globals()
+
 # Bit positions from linux/capability.h
 CAP_NET_BIND_SERVICE = 10
 CAP_NET_ADMIN = 12
 
-GRANT_CAPS_HINT = 'Run `sudo env HOME="$HOME" nxbt` first to grant permissions.'
+if IS_COMPILED:
+    GRANT_CAPS_HINT = 'Run `sudo env HOME="$HOME" nxbt` first to grant permissions.'
+else:
+    GRANT_CAPS_HINT = (
+        "Run nxbt as root, grant CAP_NET_ADMIN to the nxbt service "
+        "(e.g. systemd AmbientCapabilities), or use the Bumble USB backend. "
+        "See the Permissions section of the README."
+    )
 
 
 def get_effective_caps() -> int:
@@ -51,13 +64,19 @@ def has_bluez_caps() -> bool:
 
 
 def set_file_cap(path: str, spec: str) -> None:
+    real_path = os.path.realpath(path)
+    if not IS_COMPILED or os.path.basename(real_path).startswith("python"):
+        raise PermissionError(
+            f"Refusing to set capabilities on {real_path}: "
+            "only a compiled nxbt binary may receive file capabilities."
+        )
     if not libcap:
         return
     cap = libcap.cap_from_text(spec.encode())
     if not cap:
         raise OSError("cap_from_text failed")
     try:
-        if libcap.cap_set_file(os.fsencode(path), cap) != 0:
+        if libcap.cap_set_file(os.fsencode(real_path), cap) != 0:
             err = ctypes.get_errno()
             raise OSError(err, os.strerror(err))
     finally:
