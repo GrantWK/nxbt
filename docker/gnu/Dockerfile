@@ -1,37 +1,31 @@
-
-FROM docker.m.daocloud.io/library/debian:stable-slim
+FROM debian:stable-slim AS build
 
 ARG TARGETARCH
 
-RUN mkdir nxbt
-WORKDIR /nxbt
-COPY . .
+# Compilers are only needed where a dependency has no pre-built wheel
+# (cryptography on armv7/i386 needs Rust).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-venv python3-dev gcc \
+    && if [ "$TARGETARCH" != "amd64" ] && [ "$TARGETARCH" != "arm64" ]; then \
+         apt-get install -y --no-install-recommends cargo libffi-dev libssl-dev pkg-config; \
+       fi \
+    && rm -rf /var/lib/apt/lists/*
 
-# Use mirror for faster download in China; disable SSL verification for mirrors with cert issues
-# RUN sed -i 's|http://deb.debian.org/|https://mirrors.ustc.edu.cn/|g' /etc/apt/sources.list.d/debian.sources
-# RUN echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99-no-ssl-verify
-RUN apt update
+WORKDIR /src
+COPY pyproject.toml README.md LICENSE MANIFEST.in ./
+COPY nxbt ./nxbt
+RUN python3 -m venv /opt/nxbt \
+    && /opt/nxbt/bin/pip install --no-cache-dir .
 
-# Install Cryptography's dependencies
-ENV PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
-RUN if [ "$TARGETARCH" != "amd64" ] && [ "$TARGETARCH" != "arm64" ]; then \
-      apt install -y cargo libffi-dev libssl-dev; \
-    fi
 
-# Install UV
-RUN apt install -y pipx
-RUN pipx install uv
-ENV PATH="/root/.local/bin:$PATH"
+FROM debian:stable-slim
 
-# Install Make
-RUN apt install make
+# libusb: Bumble USB transport. libcap: capability checks.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 libcap2 libusb-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Nxbt
-RUN if [ "$TARGETARCH" = "386" ]; then \
-      apk add util-linux; \
-      setarch i386 sh -c 'make && make install'; \
-    else \
-      make && make install; \
-    fi
+COPY --from=build /opt/nxbt /opt/nxbt
+ENV PATH="/opt/nxbt/bin:$PATH"
 
-ENTRYPOINT ["/bin/nxbt"]
+ENTRYPOINT ["nxbt"]

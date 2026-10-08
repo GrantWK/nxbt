@@ -1050,11 +1050,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nuitka"
-version = "4.2rc2"
-source = { git = "https://github.com/typenoob/Nuitka.git?rev=mingw-filename#cddee56fcb33fd753f90842775b262da421713e6" }
-
-[[package]]
 name = "nxbt"
 version = "0.1.0"
 source = { editable = "." }
@@ -1084,7 +1079,6 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "nuitka" },
     { name = "pylint" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1114,7 +1108,6 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "nuitka", git = "https://github.com/typenoob/Nuitka.git?rev=mingw-filename" },
     { name = "pylint", specifier = "==4.0.5" },
     { name = "pytest", specifier = "<=9.0.1" },
     { name = "ruff", specifier = "==0.14.4" },

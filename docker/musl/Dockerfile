@@ -1,41 +1,27 @@
-FROM docker.m.daocloud.io/library/alpine:3.21
+FROM alpine:3.21 AS build
 
 ARG TARGETARCH
 
-RUN mkdir nxbt
-WORKDIR /nxbt
-COPY . .
+# Compilers are only needed where a dependency has no pre-built wheel
+# (cryptography on armv7/i386 needs Rust).
+RUN apk add --no-cache python3 python3-dev gcc musl-dev linux-headers \
+    && if [ "$TARGETARCH" != "amd64" ] && [ "$TARGETARCH" != "arm64" ]; then \
+         apk add --no-cache cargo libffi-dev openssl-dev; \
+       fi
 
-# Use mirror for faster download in China
-# RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.ustc.edu.cn/alpine#g' /etc/apk/repositories
-RUN apk update
+WORKDIR /src
+COPY pyproject.toml README.md LICENSE MANIFEST.in ./
+COPY nxbt ./nxbt
+RUN python3 -m venv /opt/nxbt \
+    && /opt/nxbt/bin/pip install --no-cache-dir .
 
-# Install patchelf from source to select a version other than 0.18.0 (Nutka complains that version)
-RUN apk add make g++
-RUN wget https://github.com/NixOS/patchelf/releases/download/0.15.5/patchelf-0.15.5.tar.gz
-RUN tar zxf patchelf-0.15.5.tar.gz \
-    && cd patchelf-0.15.5 \
-    && ./configure \
-    && make \
-    && make install
 
-# Install Cryptography's dependencies
-ENV PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
-RUN if [ "$TARGETARCH" != "amd64" ] && [ "$TARGETARCH" != "arm64" ]; then \
-      apk add cargo libffi-dev openssl-dev; \
-    fi
+FROM alpine:3.21
 
-# Install UV
-RUN apk add pipx
-RUN pipx install uv
-ENV PATH="/root/.local/bin:$PATH"
+# libusb: Bumble USB transport. libcap: capability checks.
+RUN apk add --no-cache python3 libcap libusb
 
-# Install Nxbt
-RUN if [ "$TARGETARCH" = "386" ]; then \
-      apk add util-linux; \
-      setarch i386 sh -c 'make && make install'; \
-    else \
-      make && make install; \
-    fi
+COPY --from=build /opt/nxbt /opt/nxbt
+ENV PATH="/opt/nxbt/bin:$PATH"
 
-ENTRYPOINT ["/bin/nxbt"]
+ENTRYPOINT ["nxbt"]
