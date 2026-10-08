@@ -101,6 +101,9 @@ LOOP 30m
 
 Note, a macro line starting with `#` is ignored.
 
+In the web app's macro editors, **Tab** indents (4 spaces, also across selected
+lines), **Shift+Tab** unindents, and **Esc** leaves the editor.
+
 ### Library macros
 
 The web app's **Library** tab lists macros by game. Each macro is a text file

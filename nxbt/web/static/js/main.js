@@ -1051,3 +1051,51 @@ function recordInput(packet) {
         RECORDING.samples.push([performance.now() - RECORDING.start, JSON.parse(JSON.stringify(packet))]);
     }
 }
+
+/**********************************************/
+/* Macro editors: Tab indents */
+/**********************************************/
+
+const INDENT = "    ";
+
+function replaceRange(area, start, end, text) {
+    area.setSelectionRange(start, end);
+    // insertText keeps the browser's undo history; setRangeText is the fallback
+    if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+        area.setRangeText(text, start, end, "end");
+    }
+}
+
+function handleEditorKeys(evt) {
+    let area = evt.target;
+    if (evt.key === "Escape") {
+        area.blur();  // lets keyboard users Tab out of the editor
+        return;
+    }
+    if (evt.key !== "Tab") {
+        return;
+    }
+    evt.preventDefault();
+    let start = area.selectionStart;
+    let end = area.selectionEnd;
+    if (!evt.shiftKey && start === end) {
+        replaceRange(area, start, end, INDENT);
+        return;
+    }
+    // Indent (Tab) or unindent (Shift+Tab) every line the selection touches
+    let lineStart = area.value.lastIndexOf("\n", start - 1) + 1;
+    let lines = area.value.slice(lineStart, end).split("\n");
+    let changed = lines
+        .map(line => evt.shiftKey ? line.replace(/^( {1,4}|\t)/, "") : INDENT + line)
+        .join("\n");
+    replaceRange(area, lineStart, end, changed);
+    if (start === end) {
+        area.setSelectionRange(lineStart + changed.length, lineStart + changed.length);
+    } else {
+        area.setSelectionRange(lineStart, lineStart + changed.length);
+    }
+}
+
+for (let id of ["macro-text", "library-text"]) {
+    document.getElementById(id).addEventListener("keydown", handleEditorKeys);
+}
