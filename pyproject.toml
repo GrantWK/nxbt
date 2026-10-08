@@ -67,11 +67,6 @@ include = ["nxbt*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[[tool.uv.index]]
-
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
-
 [dependency-groups]
 dev = [
     "nuitka @ git+https://github.com/typenoob/Nuitka.git@mingw-filename",
