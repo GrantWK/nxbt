@@ -58,8 +58,11 @@ nxbt = "nxbt.cli:main"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["nxbt"]
+[tool.setuptools.packages.find]
+include = ["nxbt*"]
+
+[tool.setuptools.package-data]
+"nxbt.web" = ["templates/*.html", "static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
