@@ -188,8 +188,10 @@ BLUEZ_OVERRIDE_CONTENT = "[Service]\nExecStart=\nExecStart=bluetoothd --noplugin
 
 
 def _uses_systemd() -> bool:
-    res = run_command(["ps", "--no-headers", "-o", "comm", "1"])
-    return res.stdout.decode("utf-8").strip() == "systemd"
+    try:
+        return Path("/proc/1/comm").read_text().strip() == "systemd"
+    except OSError:
+        return False
 
 
 def _reload_bluetooth() -> None:
