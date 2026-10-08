@@ -1,20 +1,27 @@
-## Motivation
+# NXBT (personal fork)
 
-Since [Brikwerk](https://github.com/Brikwerk) is no longer active on GitHub, I created this branch to maintain and continue development of the project.
+A personal fork of [typenoob/nxbt](https://github.com/typenoob/nxbt), itself a continuation of
+[Brikwerk/nxbt](https://github.com/Brikwerk/nxbt). It emulates a Nintendo Switch Pro Controller over
+Bluetooth to automate tasks in various games, at no cost beyond a PC with Bluetooth. It is also my
+learning ground for computer vision, controller emulation and the other technical pieces involved.
 
-Windows support has been preliminarily validated — I will update this section as time allows.
+## Goals
 
-## Plans
+- Reliable macros for different games, with no extra hardware
+- A web UI suited to how I use it
+- Learn computer vision (capture card + OpenCV), the Switch controller protocol, Bluetooth, and timing
 
-I started this as a fork of the original project. Once it reaches sufficient maturity and independence, I plan to establish it as a standalone repository.
+Not a goal: frame-perfect input. Bluetooth cannot guarantee it, so that belongs to a separate,
+wired-microcontroller project.
 
-- [x] Clean the code
-- [x] Use pyproject.toml and uv to manage the package and requirements
-- [ ] Fix webapp unexpected behaviors
-- [x] Use [bumble](https://github.com/google/bumble) to rewrite the repo
-- [x] Add Windows support for generic USB drivers through [zadig](https://zadig.akeo.ie/), such as [WinUSB](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/introduction-to-winusb-for-developers)
-- [ ] Add native GUI for webapp using pywebview
-- [ ] Add Android support
+## Roadmap
+
+- [x] Build hygiene: PyPI-only dependencies, pip-based Docker images, permission fixes (see [CHANGELOG](CHANGELOG.md))
+- [ ] Measure Bluetooth timing on real hardware ([scripts/hw-measurements](scripts/hw-measurements))
+- [ ] Fix the controller loop's timing and busy-waits
+- [ ] Tests for the controller core
+- [ ] Web UI rework
+- [ ] Computer vision experiments
 
 ## Quick Start
 
@@ -112,14 +119,11 @@ Once the override file exists, nxbt will skip writing it on subsequent runs.
 **Note:** when the BlueZ backend runs as root, it creates this override on start and removes it
 on exit, restarting `bluetoothd` each time. The Bumble backends never touch `bluetoothd`.
 
-## Contributions Welcome
-
-Everyone is welcome to share ideas or contribute through issues and pull requests.
-
 ## Thanks
 
-Many thanks to the original author [Brikwerk](https://github.com/Brikwerk).
+Many thanks to the original author [Brikwerk](https://github.com/Brikwerk) and to
+[typenoob](https://github.com/typenoob) for the Bumble rewrite this fork builds on.
 
 ## More
 
-The original readme can be found [here](https://github.com/typenoob/nxbt/blob/master/README.old.md)
+The original readme can be found in [README.old.md](README.old.md).
