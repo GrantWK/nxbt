@@ -708,6 +708,7 @@ function eventLoop() {
     if (JSON.stringify(INPUT_PACKET) !== JSON.stringify(INPUT_PACKET_OLD)) {
         socket.emit('input', JSON.stringify([NXBT_CONTROLLER_INDEX, INPUT_PACKET]));
         INPUT_PACKET_OLD = JSON.parse(JSON.stringify(INPUT_PACKET));
+        recordInput(INPUT_PACKET);
     }
 
     updateGamepadDisplay()
@@ -998,4 +999,55 @@ function newLibraryMacro() {
     HTML_LIBRARY_INFO.replaceChildren();
     HTML_LIBRARY_DELETE.disabled = true;
     setLibraryMessage("");
+}
+
+/**********************************************/
+/* Recording */
+/**********************************************/
+
+let RECORDING = null;
+const HTML_RECORD_BUTTON = document.getElementById("record-button");
+const HTML_RECORD_REPEAT = document.getElementById("record-repeat");
+
+socket.on('recorded_macro', function(text) {
+    LIBRARY_MACRO = null;
+    renderLibrary();
+    HTML_LIBRARY_NAME.value = "";
+    HTML_LIBRARY_TEXT.value = text;
+    HTML_LIBRARY_INFO.replaceChildren();
+    HTML_LIBRARY_DELETE.disabled = true;
+    setLibraryMessage("Recorded. Fill in the description, name it and press Save.");
+});
+
+function toggleRecording() {
+    // Keep keyboard input (e.g. Enter) from pressing the button while playing
+    HTML_RECORD_BUTTON.blur();
+    if (!RECORDING) {
+        if (NXBT_CONTROLLER_INDEX === false) {
+            setLibraryMessage("Connect a controller first.", true);
+            return;
+        }
+        RECORDING = {
+            start: performance.now(),
+            samples: [[0, JSON.parse(JSON.stringify(INPUT_PACKET))]],
+        };
+        HTML_RECORD_BUTTON.textContent = "\u25A0 Stop recording";
+        HTML_RECORD_BUTTON.classList.add("recording");
+        setLibraryMessage("Recording: play with your keyboard or gamepad. Inputs still reach the Switch.");
+        return;
+    }
+    socket.emit('recording_to_macro', JSON.stringify({
+        samples: RECORDING.samples,
+        end: performance.now() - RECORDING.start,
+        repeat: HTML_RECORD_REPEAT.value,
+    }));
+    RECORDING = null;
+    HTML_RECORD_BUTTON.textContent = "\u25CF Record";
+    HTML_RECORD_BUTTON.classList.remove("recording");
+}
+
+function recordInput(packet) {
+    if (RECORDING) {
+        RECORDING.samples.push([performance.now() - RECORDING.start, JSON.parse(JSON.stringify(packet))]);
+    }
 }

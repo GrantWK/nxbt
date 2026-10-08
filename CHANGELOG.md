@@ -9,6 +9,9 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Added
+- Record macros in the web UI: press Record, play with keyboard or gamepad,
+  and the inputs become macro text in the Library editor, optionally wrapped
+  in `LOOP 10`, `LOOP 30m` or `LOOP FOREVER`.
 - `LOOP FOREVER` repeats a macro block until stopped, and `LOOP <time>`
   (`LOOP 30m`, `LOOP 1h30m`, units s/m/h/d) repeats it for a length of time,
   finishing the repeat in progress. Loops are no longer

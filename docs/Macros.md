@@ -121,6 +121,20 @@ when nxbt runs with `sudo`) and replace a built-in macro with the same game and
 name. Game and macro names may use letters, digits, spaces and `& ' ( ) , . + -`
 (no `:` or `/`, so the files work on every OS).
 
+### Recording macros
+
+In the Library tab, press **Record**, play with your keyboard or gamepad (the
+inputs still reach the Switch), then press **Stop recording**. The recording is
+turned into macro text in the editor: each input state becomes a step held
+until the next change. Idle time before your first input is dropped; idle time
+at the end is kept. Set **Repeat** before stopping to wrap it in a loop: leave
+it blank to run once, or enter `10`, `30m` or `forever`. Fill in the header,
+name it and press **Save**.
+
+Timing is measured in the browser, so it is accurate to about one input sample
+(see the Input tab's sampling frequency). Gamepad stick positions are rounded to
+steps of 5, and changes shorter than 20 ms are folded into the step before.
+
 ## Macro Control Values
 
 | Macro Value | Control Name |
