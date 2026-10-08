@@ -9,6 +9,12 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Added
+- `LOOP FOREVER` repeats a macro block until stopped, and `LOOP <time>`
+  (`LOOP 30m`, `LOOP 1h30m`, units s/m/h/d) repeats it for a length of time,
+  finishing the repeat in progress. Loops are no longer
+  expanded in memory: `LOOP 100000` of a 14-line block used 22 MB and cost
+  ~0.15 ms per step; it now uses a few KB and ~0.2 µs per step. A macro with
+  an invalid LOOP line is skipped instead of crashing the controller.
 - Web UI: controller page split into Input, Macros, Mapping and Controller
   tabs, with a macro status strip (current step, steps left, Stop, Clear all)
   that stays visible while scrolling and switching tabs.
@@ -32,6 +38,10 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- After the controller loop stalls (e.g. reconnecting while the Switch
+  sleeps), a running macro resumes at normal speed instead of firing every
+  missed step for one tick each (39 input changes in 0.3 s after a 10 s
+  stall).
 - Running a macro from the web UI no longer freezes the web server until the
   macro finishes; status updates and live input keep working while it runs.
 - The controller loop now ticks at a steady 132 Hz (it alternated ~0 ms and

@@ -19,9 +19,11 @@ wired-microcontroller project.
 - [x] Build hygiene: PyPI-only dependencies, pip-based Docker images, permission fixes (see [CHANGELOG](CHANGELOG.md))
 - [x] Fix reconnect crashes and keep reconnecting while the Switch sleeps
 - [ ] Measure Bluetooth timing on real hardware ([scripts/hw-measurements](scripts/hw-measurements))
-- [ ] Fix the controller loop's timing and busy-waits
+- [x] Fix the controller loop's timing and busy-waits
+- [x] Web UI: tabs, live macro status, macro Library
+- [x] Infinite and timed macro loops (`LOOP FOREVER`, `LOOP 30m`)
+- [ ] Web UI: record macros, editable key mapping
 - [ ] Tests for the controller core
-- [ ] Web UI rework
 - [ ] Computer vision experiments
 
 Full backlog: [GitHub Issues](https://github.com/GrantWK/nxbt/issues).
@@ -50,6 +52,27 @@ default; pass `-i <LAN IP>` to reach it from other devices. It has no login, so
 only do that on a network you trust.
 
 See [Permissions](#permissions) for running without `sudo`.
+
+## Using the web app
+
+Open `http://127.0.0.1:8000` and pick a controller. Pair it from the Switch's
+**Controllers > Change Grip/Order** screen, or let it reconnect to a Switch it
+has paired with before. Then:
+
+- **Status strip**: the running macro, its current step, and steps or time
+  left, with **Stop** and **Clear all**. It stays visible on every tab.
+- **Input**: control the Switch with a keyboard or gamepad, and set how often
+  input is sampled.
+- **Macros**: type a macro and run it.
+- **Library**: macros grouped by game, each with what it does and where to
+  start it. Run, edit and save your own; they're stored in
+  `~/.local/share/nxbt/library/`.
+- **Mapping**: the keyboard controls.
+- **Controller**: shut down, recreate or restart the emulated controller.
+
+Macros are plain text: buttons and sticks held for a time, plus `LOOP <count>`,
+`LOOP <time>` (e.g. `LOOP 30m`) and `LOOP FOREVER`. See
+[docs/Macros.md](docs/Macros.md).
 
 ## Bluetooth Backends
 

@@ -79,6 +79,26 @@ LOOP 100
         0.1s
 ```
 
+`LOOP FOREVER` repeats its block until the macro is stopped (for example with
+the web app's Stop button).
+
+```
+LOOP FOREVER
+    A 0.4s
+    0.05s
+```
+
+`LOOP <time>` repeats its block for a length of time: `s`, `m`, `h` and `d`
+units, combined or with decimals (`LOOP 90s`, `LOOP 30m`, `LOOP 1h30m`,
+`LOOP 1.5h`, `LOOP 1d`). A new repeat starts only while time remains, and the
+repeat in progress always finishes, so a loop never stops halfway through.
+
+```
+LOOP 30m
+    A 0.4s
+    0.05s
+```
+
 Note, a macro line starting with `#` is ignored.
 
 ### Library macros
@@ -89,9 +109,8 @@ lines describing it; the Library shows them:
 
 ```
 # Mashes A until stopped.
-# Before you start: be where A should be pressed. Waits 5 s first.
-5s
-LOOP 100000
+# Before you start: be where A should be pressed.
+LOOP FOREVER
     A 0.4s
     0.05s
 ```
