@@ -18,14 +18,27 @@ I started this as a fork of the original project. Once it reaches sufficient mat
 
 ## Quick Start
 
+Install into a virtual environment (Python 3.10+):
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install .
+sudo .venv/bin/nxbt webapp -i 127.0.0.1
 ```
-docker run --rm --network host \
-  -v /var/run/dbus:/var/run/dbus \
-  --device=/dev/bus/usb --device=/dev/rfkill \
-  --security-opt apparmor=unconfined \
-  --cap-add=NET_ADMIN --cap-add=NET_BIND_SERVICE \
-  -it ghcr.io/typenoob/nxbt:musl webapp
+
+Or build and run the Docker image (Linux hosts only; containers cannot reach the
+Bluetooth adapter through Docker Desktop on macOS/Windows):
+
+```sh
+docker build -t nxbt -f docker/gnu/Dockerfile .
+docker run --rm -it --network host --cap-add=NET_ADMIN nxbt webapp -i 127.0.0.1
 ```
+
+`--network host` is required because Linux only allows Bluetooth sockets in the
+host network namespace. `-i 127.0.0.1` keeps the web app off other interfaces;
+it binds to `0.0.0.0` by default.
+
+See [Permissions](#permissions) for running without `sudo`.
 
 ## Bluetooth Backends
 
@@ -55,15 +68,24 @@ nxbt requires privileged access to interact with Bluetooth hardware. Running the
 | **Bumble (USB)** | None (if libusb works) | Direct USB communication, no kernel socket needed |
 | **BlueZ** | `cap_net_admin`, `cap_net_bind_service` | Binding to raw HCI sockets (`HCI_CHANNEL_CONTROL`), Binding to L2CAP PSM |
 
-Run once as root to install file capabilities on the binary:
-```sh
-sudo env HOME="$HOME" nxbt
-```
+nxbt checks the *effective* capabilities of its own process, so any of these work:
 
-After that, run normally without sudo:
-```sh
-nxbt demo
-```
+- **systemd service (recommended for the web app):** run as an unprivileged user and grant only what is needed:
+  ```ini
+  [Service]
+  User=nxbt
+  ExecStart=/path/to/.venv/bin/nxbt webapp -i 127.0.0.1
+  AmbientCapabilities=CAP_NET_ADMIN
+  CapabilityBoundingSet=CAP_NET_ADMIN
+  ```
+  Add `CAP_NET_BIND_SERVICE` to both lines for the BlueZ backend.
+- **Docker:** `--cap-add=NET_ADMIN` (see [Quick Start](#quick-start)).
+- **Bumble (USB):** no capabilities; the user only needs read/write access to the dongle's USB device node (e.g. via a udev rule).
+- **`sudo`:** works, but the whole process runs as root.
+
+**Do not `setcap` the Python interpreter.** nxbt runs under Python, so file capabilities would
+land on the shared interpreter (a venv's `python` is a symlink to it) and every Python program on
+the system would inherit them. nxbt refuses to do this itself.
 
 ### BlueZ backend: systemd override
 
@@ -86,6 +108,9 @@ systemctl restart bluetooth
 ```
 
 Once the override file exists, nxbt will skip writing it on subsequent runs.
+
+**Note:** whenever nxbt runs as root on a systemd host, it creates this override and restarts
+`bluetoothd` automatically, whichever backend is selected.
 
 ## Contributions Welcome
 
