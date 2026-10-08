@@ -706,7 +706,7 @@ class Nxbt:
                     "The watched controller has crashe with error",
                     self.state[controller_index]["errors"],
                 )
-            pass
+            time.sleep(1 / 30)
 
     def get_available_adapters(self):
         """Gets available adapters and whether required permissions are present.

@@ -1,3 +1,4 @@
+import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, wait
 from multiprocessing import Event
 import contextlib
@@ -16,6 +17,11 @@ from .controller import ControllerTypes
 from .protocol import ControllerProtocol
 from .input import InputParser
 from .utils import format_msg_controller, format_msg_switch
+
+TICK_PERIOD = 1 / 132
+# Longest gap between reports; matches the interval used before the loop
+# timing fix (132 ticks at the old ~255 Hz rate), which is tested on hardware.
+KEEPALIVE_INTERVAL = 0.5
 
 # Backoff between reconnect attempts while the Switch is unreachable
 RECONNECT_MIN_DELAY = 0.5
@@ -79,11 +85,19 @@ class ControllerServer:
         return True
 
     def run_with_check(self, func, *args, **kwargs):
-        ex = ThreadPoolExecutor()
-        future = ex.submit(func, *args, **kwargs)
-        while self.is_running():
-            if future.done():
-                return future.result()
+        """Runs func in a worker thread and returns its result, or None if the
+        controller is removed first. Checks for removal every 0.1 s."""
+        ex = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = ex.submit(func, *args, **kwargs)
+            while self.is_running():
+                try:
+                    return future.result(timeout=0.1)
+                except concurrent.futures.TimeoutError:
+                    continue
+            return None
+        finally:
+            ex.shutdown(wait=False)
 
     def run(self, reconnect_address=None):
         """Runs the mainloop of the controller server.
@@ -145,7 +159,7 @@ class ControllerServer:
             return self.state
 
     def mainloop(self, itr, ctrl):
-        duration_start = time.perf_counter()
+        next_tick = last_send = time.perf_counter()
         while self.is_running():
             # Start timing command processing
             timer_start = time.perf_counter()
@@ -195,37 +209,55 @@ class ControllerServer:
                         f"[send] msg len={len(msg)}, sendall took {send_elapsed:.1f}ms"
                     )
                     self.cached_msg = msg[3:]
+                    last_send = send_start
                 # Send a blank packet every so often to keep the Switch
                 # from disconnecting from the controller.
-                elif self.tick >= 132:
+                elif time.perf_counter() - last_send >= KEEPALIVE_INTERVAL:
                     send_start = time.perf_counter()
                     itr.sendall(msg)
                     send_elapsed = (time.perf_counter() - send_start) * 1000
                     self.logger.debug(
                         f"[send] keepalive len={len(msg)}, sendall took {send_elapsed:.1f}ms"
                     )
-                    self.tick = 0
+                    last_send = send_start
             except BlockingIOError:
-                continue
+                pass  # Socket busy: the unsent report is retried next tick
             except OSError:
                 # Attempt to reconnect to the Switch
                 itr, ctrl = self.save_connection()
-            # Figure out how long it took to process commands
-            duration_end = time.perf_counter()
-            duration_elapsed = duration_end - duration_start
-            duration_start = duration_end
-            sleep_time = 1 / 132 - duration_elapsed
-            if sleep_time >= 0:
-                time.sleep(sleep_time)
+                next_tick = time.perf_counter()
+
+            next_tick = self._sleep_until_next_tick(next_tick)
             self.tick += 1
 
             if self.logger_level <= logging.DEBUG:
-                self.times.append(duration_elapsed)
+                self.times.append(time.perf_counter() - timer_start)
                 if len(self.times) > 100:
-                    self.times.pop()
+                    self.times.pop(0)
                 mean_time = stat.mean(self.times)
 
                 self.logger.debug(f"Tick: {self.tick}, Mean Time: {str(1 / mean_time)}")
+
+    def _sleep_until_next_tick(self, next_tick):
+        """Sleeps until the next tick deadline, waking early if a macro step
+        ends first so its change is sent on time. Deadlines advance by a fixed
+        period, so the rate holds at 132 Hz; after a long stall the schedule
+        restarts instead of running a burst of catch-up ticks.
+
+        :return: the deadline to pass on the next call
+        """
+        now = time.perf_counter()
+        if now >= next_tick:
+            next_tick += TICK_PERIOD
+            if next_tick <= now:
+                next_tick = now + TICK_PERIOD
+        wake = next_tick
+        step_end = self.input.next_change_at()
+        if step_end is not None and step_end < wake:
+            wake = step_end
+        if wake > now:
+            time.sleep(wake - now)
+        return next_tick
 
     def _run_pairing_handshake(self, itr):
         received_first_message = False
@@ -296,11 +328,11 @@ class ControllerServer:
             self._reset_protocol()
             # Press the buttons the Change Grip/Order menu asks for
             if self.controller_type == ControllerTypes.PRO_CONTROLLER:
-                self.input.current_macro_commands = ["L", "R", "0.0s"]
+                self.input.load_step(["L", "R", "0.0s"])
             elif self.controller_type == ControllerTypes.JOYCON_L:
-                self.input.current_macro_commands = ["JCL_SL", "JCL_SR", "0.0s"]
+                self.input.load_step(["JCL_SL", "JCL_SR", "0.0s"])
             elif self.controller_type == ControllerTypes.JOYCON_R:
-                self.input.current_macro_commands = ["JCR_SL", "JCR_SR", "0.0s"]
+                self.input.load_step(["JCR_SL", "JCR_SR", "0.0s"])
             with self._bluetooth_lock():
                 itr, ctrl = self.pair()
             if itr:

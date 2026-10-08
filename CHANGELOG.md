@@ -17,6 +17,12 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- The controller loop now ticks at a steady 132 Hz (it alternated ~0 ms and
+  ~7.6 ms ticks, ~255 Hz), and wakes exactly at macro step boundaries: steps
+  are applied within ~0.1 ms of schedule instead of ~3.4 ms late, and timing
+  no longer drifts over long macros. Keepalive reports stay at every 0.5 s.
+- Waiting for setup or a connection no longer busy-waits (~1 CPU core in
+  `run_with_check`, ~1.25 cores in `Nxbt.wait_for_connection`).
 - A controller no longer crashes when the Switch sleeps longer than the
   reconnect attempts (`PSM already in use`). It now keeps retrying with a
   growing delay (up to 5 s) until the Switch wakes, and only re-pairs when
