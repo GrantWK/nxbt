@@ -1,7 +1,5 @@
 # Mashes A (0.4 s press, 0.05 s release) until stopped.
-# Before you start: be where A should be pressed repeatedly. The macro waits
-# 5 s before the first press.
-5s
+# Before you start: be where A should be pressed repeatedly.
 LOOP FOREVER
     A 0.4s
     0.05s
