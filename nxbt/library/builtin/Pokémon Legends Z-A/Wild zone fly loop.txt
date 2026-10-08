@@ -1,0 +1,20 @@
+# Walks into the wild zone, opens the map, flies back to the same wild zone,
+# and repeats until stopped.
+# Before you start: you have just flown to a wild zone. The macro waits 5 s
+# before moving.
+5s
+LOOP 100000
+    L_STICK@+000+100 1s
+    L_STICK@+000+000 0.2s
+    A 0.4s
+    2.5s
+    PLUS 0.1s
+    1s
+    A 0.4s
+    0.1s
+    A 0.4s
+    0.1s
+    A 0.4s
+    0.1s
+    A 0.4s
+    3s

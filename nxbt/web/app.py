@@ -20,6 +20,7 @@ from .. import __version__
 from ..utils import load_file
 from ..nxbt import Nxbt, PRO_CONTROLLER
 from ..backends import BACKENDS
+from ..library import Library
 from ..setcap import GRANT_CAPS_HINT
 
 # Polling payloads can batch many input packets; default limit (16) is too low.
@@ -49,8 +50,9 @@ def allowed_hosts(ip):
 
 
 class WebApp:
-    def __init__(self, nxbt=None, *, debug=False, backend="bumble"):
+    def __init__(self, nxbt=None, *, debug=False, backend="bumble", library=None):
         self.nxbt = nxbt
+        self.library = library or Library()
         self._debug = debug
         self._backend = backend
         self._user_info = {}
@@ -105,6 +107,10 @@ class WebApp:
         self.sio.on("macro")(self.handle_macro)
         self.sio.on("stop_macro")(self.handle_stop_macro)
         self.sio.on("clear_macros")(self.handle_clear_macros)
+        self.sio.on("library_list")(self.handle_library_list)
+        self.sio.on("library_get")(self.handle_library_get)
+        self.sio.on("library_save")(self.handle_library_save)
+        self.sio.on("library_delete")(self.handle_library_delete)
 
     def _run_async(self, coro, *, wait=True):
         """Run a coroutine from sync Socket.IO handlers."""
@@ -242,6 +248,35 @@ class WebApp:
             self.nxbt.clear_macros(index)
         except ValueError:
             pass
+
+    def handle_library_list(self, sid):
+        self._emit_to(sid, "library", self.library.list())
+
+    def handle_library_get(self, sid, message):
+        game, name = json.loads(message)
+        try:
+            self._emit_to(sid, "library_macro", self.library.get(game, name))
+        except (ValueError, OSError) as e:
+            self._emit_to(sid, "library_error", str(e))
+
+    def handle_library_save(self, sid, message):
+        game, name, text = json.loads(message)
+        try:
+            self.library.save(game, name, text)
+        except (ValueError, OSError) as e:
+            self._emit_to(sid, "library_error", str(e))
+            return
+        self._emit_to(sid, "library", self.library.list())
+        self._emit_to(sid, "library_macro", self.library.get(game, name))
+
+    def handle_library_delete(self, sid, message):
+        game, name = json.loads(message)
+        try:
+            self.library.delete(game, name)
+        except (ValueError, OSError) as e:
+            self._emit_to(sid, "library_error", str(e))
+            return
+        self._emit_to(sid, "library", self.library.list())
 
     def app_for(self, ip):
         """The ASGI app to serve when bound to `ip`."""

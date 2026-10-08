@@ -1,0 +1,5 @@
+# Presses A twice a second, 50 times. Handy for skipping dialogue.
+# Before you start: be on the screen where A should be pressed.
+LOOP 50
+    A 0.1s
+    0.4s
