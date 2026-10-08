@@ -12,6 +12,11 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 - Web UI: controller page split into Input, Macros, Mapping and Controller
   tabs, with a macro status strip (current step, steps left, Stop, Clear all)
   that stays visible while scrolling and switching tabs.
+- Macro Library: macros grouped by game, each with a description and
+  "Before you start" notes. Ships starter macros (General; Pokémon Legends
+  Z-A: Turbo A, Wild zone fly loop); macros you save go to
+  `~/.local/share/nxbt/library/`. Web UI Library tab to browse, run, edit,
+  save and delete them.
 
 ### Security
 - The web app now listens on `127.0.0.1` by default (was `0.0.0.0`, every
