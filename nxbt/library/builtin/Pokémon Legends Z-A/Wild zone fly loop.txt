@@ -3,7 +3,7 @@
 # Before you start: you have just flown to a wild zone. The macro waits 5 s
 # before moving.
 5s
-LOOP 100000
+LOOP FOREVER
     L_STICK@+000+100 1s
     L_STICK@+000+000 0.2s
     A 0.4s
