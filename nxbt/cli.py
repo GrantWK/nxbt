@@ -86,9 +86,10 @@ parser.add_argument(
     "-i",
     "--ip",
     required=False,
-    default="0.0.0.0",
+    default="127.0.0.1",
     type=str,
-    help="""Specifies the IP to run the webapp at. Defaults to 0.0.0.0""",
+    help="""Specifies the IP to run the webapp at. Defaults to 127.0.0.1 (this
+                    machine only); use your LAN IP or 0.0.0.0 to allow other devices.""",
 )
 parser.add_argument(
     "-p",
