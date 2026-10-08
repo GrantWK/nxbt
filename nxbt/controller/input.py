@@ -4,6 +4,10 @@ from json import dumps
 
 from .macro import parse_macro
 
+# Longest delay a macro catches up on by shortening the next step; after a
+# longer stall (e.g. a reconnect) the next step starts on time from now.
+MAX_CATCH_UP = 0.1
+
 
 DIRECT_INPUT_IDLE_PACKET = {
     # Sticks
@@ -182,40 +186,48 @@ class InputParser:
 
             # End the current step once it has been sent and its time is up.
             # The next step starts at this step's scheduled end, so late ticks
-            # don't add up over a macro.
+            # don't add up over a macro, unless the loop stalled (e.g. during a
+            # reconnect): then it starts now rather than rushing through the
+            # missed steps one tick each.
             if (
                 self.current_macro_commands
                 and self._step_applied
                 and now - self.macro_timer_start >= self.macro_timer_length
             ):
-                step_start = self.macro_timer_start + self.macro_timer_length
+                scheduled_end = self.macro_timer_start + self.macro_timer_length
+                if now - scheduled_end <= MAX_CATCH_UP:
+                    step_start = scheduled_end
                 self.current_macro_commands = None
-                if not self.current_macro:
-                    step_start = now
-                    if state:
-                        finished = state["finished_macros"]
-                        finished.append(self.current_macro_id)
-                        state["finished_macros"] = finished
-
-            # Check if we can start on a new macro.
-            if not self.current_macro and self.macro_buffer:
-                macro, macro_id = self.macro_buffer.pop(0)
-                try:
-                    self.current_macro = parse_macro(macro)
-                    self.current_macro_id = macro_id
-                except ValueError as e:
-                    # Skip the macro instead of crashing the controller
-                    logging.getLogger("nxbt").warning(f"Skipping macro: {e}")
-                    if state:
-                        state["finished_macros"] = state["finished_macros"] + [macro_id]
 
             # Load the next step in the same tick the previous one ended
-            if not self.current_macro_commands and self.current_macro:
-                self.load_step(self.current_macro.pop().strip(" ").split(" "), step_start)
+            if not self.current_macro_commands:
+                if not self.current_macro and self.macro_buffer:
+                    self._start_next_macro(state)
+                if self.current_macro:
+                    step = self.current_macro.pop()
+                    if step is None:
+                        self._finish_macro(state)
+                    else:
+                        self.load_step(step.strip(" ").split(" "), step_start)
 
             if self.current_macro_commands:
                 self.set_macro_input(self.current_macro_commands)
                 self._step_applied = True
+
+    def _start_next_macro(self, state):
+        macro, macro_id = self.macro_buffer.pop(0)
+        self.current_macro_id = macro_id
+        try:
+            self.current_macro = parse_macro(macro)
+        except ValueError as e:
+            # Skip the macro instead of crashing the controller
+            logging.getLogger("nxbt").warning(f"Skipping macro: {e}")
+            self._finish_macro(state)
+
+    def _finish_macro(self, state):
+        self.current_macro = None
+        if state:
+            state["finished_macros"] = state["finished_macros"] + [self.current_macro_id]
 
     def load_step(self, commands, start=None):
         """Makes `commands` (buttons/sticks, then a duration like "0.1s") the
@@ -232,10 +244,17 @@ class InputParser:
         return {
             "id": self.current_macro_id,
             "step": " ".join(self.current_macro_commands or []),
-            # None means the macro repeats until stopped (LOOP FOREVER)
+            # None when it repeats until stopped or for a time (LOOP FOREVER / LOOP 30m)
             "steps_left": self.current_macro.remaining if self.current_macro else 0,
+            # Whole seconds until a timed loop ends, or None. Rounded so the
+            # status (published on change) updates at most once a second.
+            "time_left": self._time_left(),
             "queued": len(self.macro_buffer),
         }
+
+    def _time_left(self):
+        left = self.current_macro.time_left() if self.current_macro else None
+        return None if left is None else round(left)
 
     def next_change_at(self):
         """perf_counter() time the current macro step ends, or None."""

@@ -752,6 +752,18 @@ function currentMacroStatus() {
     return controller ? controller.macro_status : null;
 }
 
+function formatDuration(seconds) {
+    let units = [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]];
+    let parts = [];
+    for (let [label, size] of units) {
+        if (seconds >= size || (label === "s" && !parts.length)) {
+            parts.push(`${Math.floor(seconds / size)}${label}`);
+            seconds %= size;
+        }
+    }
+    return parts.slice(0, 2).join(" ");
+}
+
 function updateMacroStatus() {
     let status = currentMacroStatus();
     HTML_MACRO_STOP_BUTTON.disabled = !status;
@@ -759,7 +771,12 @@ function updateMacroStatus() {
         HTML_MACRO_STATUS_TEXT.textContent = "Idle";
         return;
     }
-    let progress = status.steps_left === null ? "repeats until stopped" : `${status.steps_left} steps left`;
+    let progress = `${status.steps_left} steps left`;
+    if (status.time_left !== null && status.time_left !== undefined) {
+        progress = `about ${formatDuration(status.time_left)} left`;
+    } else if (status.steps_left === null) {
+        progress = "repeats until stopped";
+    }
     let text = `Running ${status.id.slice(0, 6)} · step: ${status.step || "-"} · ${progress}`;
     if (status.queued) {
         text += ` · ${status.queued} queued`;

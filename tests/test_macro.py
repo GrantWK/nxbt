@@ -3,7 +3,7 @@
 import copy
 import tracemalloc
 from itertools import islice
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,12 +12,9 @@ from nxbt.controller.macro import parse_macro
 from nxbt.library import BUILTIN_DIR
 
 
-def steps(text, limit=None):
+def steps(text):
     cursor = parse_macro(text)
-    out = []
-    while cursor and (limit is None or len(out) < limit):
-        out.append(cursor.pop())
-    return out
+    return list(iter(cursor.pop, None))
 
 
 def test_plain_steps_skip_blanks_and_comments():
@@ -58,7 +55,7 @@ def test_loop_forever_repeats_until_stopped():
     produced = [cursor.pop() for _ in range(1001)]
     assert produced[0] == "START 1s"
     assert produced[1:] == ["A 0.4s", "0.05s"] * 500
-    assert cursor  # still going
+    assert cursor.pop() is not None  # still going
 
 
 def test_remaining_counts_down_for_finite_macros():
@@ -68,7 +65,7 @@ def test_remaining_counts_down_for_finite_macros():
     assert cursor.remaining == 5
 
 
-@pytest.mark.parametrize("line", ["LOOP", "LOOP x", "LOOP -1", "LOOP 2 3"])
+@pytest.mark.parametrize("line", ["LOOP", "LOOP x", "LOOP -1", "LOOP 2 3", "LOOP 5x", "LOOP 0s", "LOOP 1h-5m"])
 def test_invalid_loop_counts_raise(line):
     with pytest.raises(ValueError):
         parse_macro(f"{line}\n    A 1s\n")
@@ -117,3 +114,60 @@ def test_status_reports_forever_as_none():
     parser.buffer_macro("LOOP FOREVER\n    A 0.4s\n    0.05s\n", "m1")
     parser.set_protocol_input()
     assert parser.macro_status()["steps_left"] is None
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.mark.parametrize("text, seconds", [
+    ("90s", 90), ("30m", 1800), ("2h", 7200), ("1d", 86400), ("1h30m", 5400), ("1.5h", 5400), ("30M", 1800),
+])
+def test_timed_loop_lengths(text, seconds):
+    clock = FakeClock()
+    cursor = parse_macro(f"LOOP {text}\n    A 1s\n", clock)
+    cursor.pop()
+    assert cursor.time_left() == seconds
+
+
+def test_timed_loop_finishes_the_repeat_it_started():
+    clock = FakeClock()
+    cursor = parse_macro("LOOP 10s\n    A 3s\n    B 3s\nDONE 0.1s\n", clock)
+    produced = []
+    while (step := cursor.pop()) is not None:
+        produced.append(step)
+        clock.now += float(step.split()[-1][:-1])  # each step takes its time
+
+    # Repeats start at 0 s and 6 s; the third would start at 12 s > 10 s
+    assert produced == ["A 3s", "B 3s", "A 3s", "B 3s", "DONE 0.1s"]
+    assert cursor.remaining is None
+
+
+def test_engine_does_not_rush_after_a_stall():
+    clock = [0.0]
+    parser = make_parser()
+    applied = []
+    parser.set_macro_input = lambda cmds: applied.append(" ".join(cmds))
+    with patch("nxbt.controller.input.perf_counter", lambda: clock[0]):
+        parser.buffer_macro("LOOP FOREVER\n    A 0.4s\n    0.05s\n", "m")
+        parser.set_protocol_input()
+        clock[0] += 10.0  # e.g. a reconnect
+        for _ in range(40):  # the next ~0.3 s of ticks
+            clock[0] += 1 / 132
+            parser.set_protocol_input()
+
+    changes = sum(a != b for a, b in zip(applied, applied[1:]))
+    assert changes <= 2  # was 39: every missed step got one tick
+
+
+def test_status_reports_time_left_for_timed_loops():
+    parser = make_parser()
+    parser.buffer_macro("LOOP 30m\n    A 0.4s\n    0.05s\n", "m1")
+    parser.set_protocol_input()
+    status = parser.macro_status()
+    assert status["steps_left"] is None
+    assert 1790 < status["time_left"] <= 1800

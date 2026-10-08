@@ -153,7 +153,7 @@ def test_macro_status_while_running_and_idle():
         parser.buffer_macro("A 0.05s\nB 0.05s\n", "m1")
         parser.set_protocol_input()
 
-    assert parser.macro_status() == {"id": "m1", "step": "A 0.05s", "steps_left": 1, "queued": 0}
+    assert parser.macro_status() == {"id": "m1", "step": "A 0.05s", "steps_left": 1, "time_left": None, "queued": 0}
 
 
 def test_macro_status_published_only_on_change():
