@@ -188,8 +188,10 @@ BLUEZ_OVERRIDE_CONTENT = "[Service]\nExecStart=\nExecStart=bluetoothd --noplugin
 
 
 def _uses_systemd() -> bool:
-    res = run_command(["ps", "--no-headers", "-o", "comm", "1"])
-    return res.stdout.decode("utf-8").strip() == "systemd"
+    try:
+        return Path("/proc/1/comm").read_text().strip() == "systemd"
+    except OSError:
+        return False
 
 
 def _reload_bluetooth() -> None:
@@ -207,20 +209,6 @@ def has_bluez_override_access() -> bool:
     if BLUEZ_OVERRIDE_DIR.exists():
         return os.access(BLUEZ_OVERRIDE_DIR, os.W_OK)
     return os.access(BLUEZ_OVERRIDE_DIR.parent, os.W_OK)
-
-
-def ensure_bluez_override() -> None:
-    """Create the BlueZ systemd override if missing (requires root)."""
-    logger = logging.getLogger("nxbt")
-    if not _uses_systemd():
-        return
-    if BLUEZ_OVERRIDE_PATH.is_file():
-        return
-    BLUEZ_OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
-    with BLUEZ_OVERRIDE_PATH.open("w") as f:
-        f.write(BLUEZ_OVERRIDE_CONTENT)
-    _reload_bluetooth()
-    logger.debug("BlueZ systemd override installed")
 
 
 def toggle_clean_bluez(toggle):

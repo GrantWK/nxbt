@@ -5,7 +5,7 @@ import os
 import traceback
 from sys import exit
 
-from .setcap import set_file_cap
+from .setcap import IS_COMPILED, set_file_cap
 from .nxbt import Nxbt, PRO_CONTROLLER
 from .backends import BACKENDS
 from .tui import InputTUI
@@ -427,18 +427,14 @@ def list_switch_addresses(args):
 
 
 def _grant_permissions():
-    try:
-        set_file_cap(
-            os.readlink("/proc/self/exe"), "cap_net_admin,cap_net_bind_service+eip"
-        )
-    except (PermissionError, FileNotFoundError, OSError):
-        pass
-    if os.name == "posix" and os.geteuid() == 0:
+    # Only a compiled binary is a safe target; under a Python interpreter,
+    # /proc/self/exe is shared by every Python program on the system.
+    if IS_COMPILED:
         try:
-            from .backends.internal.bluez import ensure_bluez_override
-
-            ensure_bluez_override()
-        except (PermissionError, OSError):
+            set_file_cap(
+                os.readlink("/proc/self/exe"), "cap_net_admin,cap_net_bind_service+eip"
+            )
+        except (PermissionError, FileNotFoundError, OSError):
             pass
 
 

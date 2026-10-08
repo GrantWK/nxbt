@@ -3,16 +3,19 @@
 
 import sys
 import importlib.util
+from pathlib import Path
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 # Load the real bluez module directly from file, bypassing sys.modules
 # This avoids conflicts with conftest.py's global mock of nxbt.bluez
-_spec = importlib.util.spec_from_file_location(
-    "_real_bluez",
-    "/home/coyote/nxbt/nxbt/backends/internal/bluez.py",
+_BLUEZ_PATH = (
+    Path(__file__).resolve().parent.parent / "nxbt" / "backends" / "internal" / "bluez.py"
 )
+_spec = importlib.util.spec_from_file_location("_real_bluez", _BLUEZ_PATH)
 bluez_mod = importlib.util.module_from_spec(_spec)
+# Resolve bluez.py's relative imports (e.g. `from .tools import ...`)
+bluez_mod.__package__ = "nxbt.backends.internal"
 sys.modules["_real_bluez"] = bluez_mod
 _spec.loader.exec_module(bluez_mod)
 

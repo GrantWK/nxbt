@@ -1,84 +1,35 @@
-.PHONY: all install-deps venv pip-deps build build-uv build-pip install docker
+.PHONY: all install-deps install test docker
 
-BITNESS := $(shell getconf LONG_BIT 2>/dev/null || echo 64)
-NUITKA_GIT := nuitka @ git+https://github.com/nuitka/Nuitka.git@factory
+VENV   := .venv
+PYTHON := $(VENV)/bin/python
 
-ifeq ($(OS),Windows_NT)
-NXBT_OUT := release/nxbt.exe
-NXBT_BIN := nxbt.exe
-else
-UV_FLAGS := --no-managed-python
-NXBT_OUT := release/nxbt
-NXBT_BIN := nxbt
-endif
+all: install
 
-PYTHON := .msys2-venv/bin/python
-PIP    := .msys2-venv/bin/pip
-
-all: install-deps build
-
+# System libraries used at runtime (libusb for Bumble USB, libcap for
+# capability handling, bluez for the BlueZ backend) plus a compiler for
+# dependencies that have no pre-built wheel on the current architecture.
 install-deps:
 	@SUDO=; if [ "$$(id -u)" -ne 0 ]; then SUDO=sudo; fi; \
 	if [ -f /etc/alpine-release ]; then \
 		$$SUDO apk update && \
-		$$SUDO apk add --no-cache git ccache make gcc g++ python3 python3-dev libcap-dev libusb-dev dbus-dev patchelf procps bluez; \
+		$$SUDO apk add --no-cache python3 python3-dev py3-pip gcc musl-dev libcap libusb bluez; \
 	elif [ -f /etc/debian_version ]; then \
 		$$SUDO apt update && \
-		$$SUDO apt install -y git wget ccache make gcc g++ python3 python3-pip python3-venv python3-dev \
-			libcap2 libcap-dev libusb-1.0-0-dev libssl-dev libdbus-1-dev patchelf procps bluez; \
-	elif [ -n "$$MSYSTEM" ]; then \
-		case "$$MSYSTEM" in \
-			MINGW64|UCRT64) ;; \
-			*) echo "error: Got MSYSTEM=$$MSYSTEM"; exit 1 ;; \
-		esac; \
-		pacman -S --noconfirm --needed \
-			make git \
-			$$MINGW_PACKAGE_PREFIX-ccache \
-			$$MINGW_PACKAGE_PREFIX-gcc \
-			$$MINGW_PACKAGE_PREFIX-libusb \
-			$$MINGW_PACKAGE_PREFIX-python \
-			$$MINGW_PACKAGE_PREFIX-python-setuptools \
-			$$MINGW_PACKAGE_PREFIX-python-cryptography \
-			$$MINGW_PACKAGE_PREFIX-python-grpcio \
-			$$MINGW_PACKAGE_PREFIX-python-zstandard \
-			$$MINGW_PACKAGE_PREFIX-python-aiohttp \
-			$$MINGW_PACKAGE_PREFIX-python-greenlet \
-			$$MINGW_PACKAGE_PREFIX-python-starlette \
-			$$MINGW_PACKAGE_PREFIX-python-markupsafe \
-			$$MINGW_PACKAGE_PREFIX-python-psutil; \
+		$$SUDO apt install -y python3 python3-dev python3-venv gcc libcap2 libusb-1.0-0 bluez; \
 	else \
-		echo "Unsupported OS. Only Debian, Ubuntu, Alpine and MSYS2 MINGW64/UCRT64 are supported. Skipping dependency installation."; \
+		echo "Unsupported OS for install-deps. Install Python 3.10+, libusb, libcap and bluez manually."; \
 	fi
 
-msys2-venv:
-	@test -d .msys2-venv/bin || python3 -m venv .msys2-venv --system-site-packages
+$(PYTHON):
+	python3 -m venv $(VENV)
 
-pip-deps: msys2-venv
-	$(PIP) install --extra-index-url https://pypi.org/simple/ -e . "$(NUITKA_GIT)"
+install: $(PYTHON)
+	$(PYTHON) -m pip install .
 
-build-uv:
-	uv run $(UV_FLAGS) nuitka nxbt
-
-build-pip: pip-deps
-	$(PYTHON) -m nuitka nxbt
-
-build: install-deps
-	# uv is unsupported on MSYS2 MINGW64/UCRT64 Python; use pip instead.
-	# https://github.com/astral-sh/uv/issues/3573
-	@if [ -n "$$MSYSTEM" ]; then \
-		$(MAKE) build-pip; \
-	elif command -v uv >/dev/null 2>&1; then \
-		$(MAKE) build-uv; \
-	else \
-		echo "Error! Please build on MSYS2 or with uv installed."; \
-	fi
-
-install:
-	@SUDO=; if [ -z "$$MSYSTEM" ] && [ "$$(id -u)" -ne 0 ]; then SUDO=sudo; fi; \
-	$$SUDO install -m 755 $(NXBT_OUT) /usr/bin/$(NXBT_BIN)
+test: $(PYTHON)
+	$(PYTHON) -m pip install -e ".[dev]"
+	$(PYTHON) -m pytest
 
 docker:
 	docker build -t nxbt:gnu -f docker/gnu/Dockerfile .
 	docker build -t nxbt:musl -f docker/musl/Dockerfile .
-	docker build -t nxbt:mingw64 --build-arg MSYSTEM=MINGW64 -f docker/msys2/Dockerfile .
-	docker build -t nxbt:ucrt64 --build-arg MSYSTEM=UCRT64 -f docker/msys2/Dockerfile .

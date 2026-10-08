@@ -114,6 +114,25 @@ def test_addresses_command(mock_find_devices, capsys):
     assert "XX:XX:XX:XX:XX:XX" in captured.out
 
 
+def test_root_bumble_run_does_not_touch_bluetoothd(mock_find_devices, capsys):
+    import sys
+
+    bluez = sys.modules["nxbt.backends.internal.bluez"]
+    bluez.reset_mock()
+    with (
+        patch("nxbt.cli.os.geteuid", return_value=0),
+        patch("subprocess.run") as mock_run,
+    ):
+        main(["addresses", "-b", "bumble"])
+
+    systemctl_calls = [
+        c for c in mock_run.call_args_list if c.args and "systemctl" in c.args[0]
+    ]
+    assert systemctl_calls == []
+    # No override writes or bluetoothd restarts via the BlueZ helpers either.
+    assert bluez.mock_calls == []
+
+
 def test_tui_command(mock_input_tui):
     main(["tui"])
     mock_input_tui.assert_called_once()

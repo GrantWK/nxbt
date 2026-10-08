@@ -58,20 +58,17 @@ nxbt = "nxbt.cli:main"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["nxbt"]
+[tool.setuptools.packages.find]
+include = ["nxbt*"]
+
+[tool.setuptools.package-data]
+"nxbt.web" = ["templates/*.html", "static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[[tool.uv.index]]
-
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
-
 [dependency-groups]
 dev = [
-    "nuitka @ git+https://github.com/typenoob/Nuitka.git@mingw-filename",
     "ruff==0.14.4",
     "pytest<=9.0.1",
     "pylint==4.0.5",
