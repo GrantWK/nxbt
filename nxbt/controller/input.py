@@ -93,6 +93,8 @@ class InputParser:
 
         # The start time for the current macro commands
         self.macro_timer_start = 0
+        # Whether the current step has been applied to at least one report
+        self._step_applied = False
 
         self.controller_input = None
 
@@ -172,6 +174,26 @@ class InputParser:
             self.controller_input = None
 
         elif self.macro_buffer or self.current_macro or self.current_macro_commands:
+            now = perf_counter()
+            step_start = now
+
+            # End the current step once it has been sent and its time is up.
+            # The next step starts at this step's scheduled end, so late ticks
+            # don't add up over a macro.
+            if (
+                self.current_macro_commands
+                and self._step_applied
+                and now - self.macro_timer_start >= self.macro_timer_length
+            ):
+                step_start = self.macro_timer_start + self.macro_timer_length
+                self.current_macro_commands = None
+                if not self.current_macro:
+                    step_start = now
+                    if state:
+                        finished = state["finished_macros"]
+                        finished.append(self.current_macro_id)
+                        state["finished_macros"] = finished
+
             # Check if we can start on a new macro.
             if not self.current_macro and self.macro_buffer:
                 # Preprocess command lines of current macro
@@ -179,29 +201,27 @@ class InputParser:
                 self.current_macro = self.parse_macro(macro[0])
                 self.current_macro_id = macro[1]
 
-            # Check if we can load the next set of commands
+            # Load the next step in the same tick the previous one ended
             if not self.current_macro_commands and self.current_macro:
-                self.current_macro_commands = (
-                    self.current_macro.pop(0).strip(" ").split(" ")
-                )
+                self.load_step(self.current_macro.pop(0).strip(" ").split(" "), step_start)
 
-                # Timing metadata extraction
-                timer_length = self.current_macro_commands[-1]
-                timer_length = timer_length[0 : len(timer_length) - 1]
-                self.macro_timer_length = float(timer_length)
-                self.macro_timer_start = perf_counter()
+            if self.current_macro_commands:
+                self.set_macro_input(self.current_macro_commands)
+                self._step_applied = True
 
-            self.set_macro_input(self.current_macro_commands)
+    def load_step(self, commands, start=None):
+        """Makes `commands` (buttons/sticks, then a duration like "0.1s") the
+        current macro step. Every step is sent at least once, even "0.0s"."""
+        self.current_macro_commands = commands
+        self.macro_timer_length = float(commands[-1][:-1])
+        self.macro_timer_start = perf_counter() if start is None else start
+        self._step_applied = False
 
-            # Check if we're done inputting the current command
-            time_delta = perf_counter() - self.macro_timer_start
-            if time_delta > self.macro_timer_length:
-                self.current_macro_commands = None
-                # Check if we're done the current macro
-                if not self.current_macro and state:
-                    finished = state["finished_macros"]
-                    finished.append(self.current_macro_id)
-                    state["finished_macros"] = finished
+    def next_change_at(self):
+        """perf_counter() time the current macro step ends, or None."""
+        if self.current_macro_commands and self._step_applied:
+            return self.macro_timer_start + self.macro_timer_length
+        return None
 
     def parse_controller_input(self, controller_input):
         # Check for input validity
