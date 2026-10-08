@@ -14,6 +14,8 @@ let HTML_LOADER_TEXT = document.getElementById("loader-text");
 let HTML_LOADER_RECREATE_WRAPPER = document.getElementById("loader-recreate-wrapper");
 let HTML_CONTROLLER_CONFIG = document.getElementById("controller-config");
 let HTML_MACRO_TEXT = document.getElementById("macro-text");
+let HTML_MACRO_STATUS_TEXT = document.getElementById("macro-status-text");
+let HTML_MACRO_STOP_BUTTON = document.getElementById("macro-stop-button");
 let HTML_STATUS_INDICATOR = document.getElementById("status-indicator");
 let HTML_STATUS_INDICATOR_LIGHT = document.getElementById("status-indicator-light");
 let HTML_STATUS_INDICATOR_TEXT = document.getElementById("status-indicator-text");
@@ -196,14 +198,15 @@ let PRO_CONTROLLER_DISPLAY = {
 
 let socket = io();
 
-// Request to the state at 1Hz
+// Request the state at 4Hz so macro progress is visible while it runs
 socket.emit('state');
 let stateInterval = setInterval(function() {
     socket.emit('state');
-}, 1000);
+}, 250);
 
 socket.on('state', function(state) {
     STATE = state;
+    updateMacroStatus();
 });
 
 socket.on('connect', function() {
@@ -731,6 +734,51 @@ function eventLoop() {
 function sendMacro() {
     let macro = HTML_MACRO_TEXT.value.toUpperCase();
     socket.emit('macro', JSON.stringify([NXBT_CONTROLLER_INDEX, macro]));
+}
+
+function stopMacro() {
+    let status = currentMacroStatus();
+    if (status) {
+        socket.emit('stop_macro', JSON.stringify([NXBT_CONTROLLER_INDEX, status.id]));
+    }
+}
+
+function clearMacros() {
+    socket.emit('clear_macros', NXBT_CONTROLLER_INDEX);
+}
+
+function currentMacroStatus() {
+    let controller = STATE && STATE[NXBT_CONTROLLER_INDEX];
+    return controller ? controller.macro_status : null;
+}
+
+function updateMacroStatus() {
+    let status = currentMacroStatus();
+    HTML_MACRO_STOP_BUTTON.disabled = !status;
+    if (!status) {
+        HTML_MACRO_STATUS_TEXT.textContent = "Idle";
+        return;
+    }
+    let text = `Running ${status.id.slice(0, 6)} · step: ${status.step || "-"} · ${status.steps_left} steps left`;
+    if (status.queued) {
+        text += ` · ${status.queued} queued`;
+    }
+    HTML_MACRO_STATUS_TEXT.textContent = text;
+}
+
+/**********************************************/
+/* Tabs */
+/**********************************************/
+
+function showTab(name) {
+    for (let tab of document.querySelectorAll(".tab")) {
+        let active = tab.dataset.tab === name;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", active);
+    }
+    for (let panel of document.querySelectorAll(".tab-panel")) {
+        panel.classList.toggle("hidden", panel.id !== `tab-${name}`);
+    }
 }
 
 /**********************************************/
