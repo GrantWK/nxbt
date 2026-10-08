@@ -109,8 +109,8 @@ systemctl restart bluetooth
 
 Once the override file exists, nxbt will skip writing it on subsequent runs.
 
-**Note:** whenever nxbt runs as root on a systemd host, it creates this override and restarts
-`bluetoothd` automatically, whichever backend is selected.
+**Note:** when the BlueZ backend runs as root, it creates this override on start and removes it
+on exit, restarting `bluetoothd` each time. The Bumble backends never touch `bluetoothd`.
 
 ## Contributions Welcome
 

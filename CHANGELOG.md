@@ -17,6 +17,10 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- Running nxbt as root no longer rewrites the `bluetoothd` systemd override
+  and restarts `bluetoothd` regardless of backend. That disconnected other
+  Bluetooth devices and left `bluetoothd` running without plugins until
+  reboot when using Bumble. Only the BlueZ backend manages the override now.
 - Permission checks now read the process's effective capabilities
   (`/proc/self/status`) instead of file capabilities on the executable, so
   running as root, under systemd `AmbientCapabilities`, or in Docker with

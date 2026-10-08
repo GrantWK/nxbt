@@ -211,20 +211,6 @@ def has_bluez_override_access() -> bool:
     return os.access(BLUEZ_OVERRIDE_DIR.parent, os.W_OK)
 
 
-def ensure_bluez_override() -> None:
-    """Create the BlueZ systemd override if missing (requires root)."""
-    logger = logging.getLogger("nxbt")
-    if not _uses_systemd():
-        return
-    if BLUEZ_OVERRIDE_PATH.is_file():
-        return
-    BLUEZ_OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
-    with BLUEZ_OVERRIDE_PATH.open("w") as f:
-        f.write(BLUEZ_OVERRIDE_CONTENT)
-    _reload_bluetooth()
-    logger.debug("BlueZ systemd override installed")
-
-
 def toggle_clean_bluez(toggle):
     """Enables or disables all BlueZ plugins,
     Requires root user to be run. The units and Bluetooth

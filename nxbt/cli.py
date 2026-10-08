@@ -436,13 +436,6 @@ def _grant_permissions():
             )
         except (PermissionError, FileNotFoundError, OSError):
             pass
-    if os.name == "posix" and os.geteuid() == 0:
-        try:
-            from .backends.internal.bluez import ensure_bluez_override
-
-            ensure_bluez_override()
-        except (PermissionError, OSError):
-            pass
 
 
 def main(args=None):
