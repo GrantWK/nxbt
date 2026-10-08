@@ -217,6 +217,17 @@ class InputParser:
         self.macro_timer_start = perf_counter() if start is None else start
         self._step_applied = False
 
+    def macro_status(self):
+        """What the macro engine is doing, for display; None when idle."""
+        if not (self.current_macro_commands or self.current_macro or self.macro_buffer):
+            return None
+        return {
+            "id": self.current_macro_id,
+            "step": " ".join(self.current_macro_commands or []),
+            "steps_left": len(self.current_macro or []),
+            "queued": len(self.macro_buffer),
+        }
+
     def next_change_at(self):
         """perf_counter() time the current macro step ends, or None."""
         if self.current_macro_commands and self._step_applied:

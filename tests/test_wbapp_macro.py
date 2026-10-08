@@ -105,6 +105,9 @@ def test_controller_creation_no_adapters_detected(web_app, mock_nxbt):
     mock_nxbt.create_controller.assert_not_called()
     payload = mock_emit.await_args.args[1]
     assert payload["title"] == "No Adapters Available"
+
+
+def test_handle_macro(web_app, mock_nxbt):
     """Test that handle_macro passes the correct args to nxbt.macro."""
     macro_payload = json.dumps([0, "B 0.1s A 0.1s"])
     web_app.handle_macro("test_sid", macro_payload)
@@ -121,3 +124,19 @@ def test_handle_input_ignores_missing_controller(web_app, mock_nxbt):
         "Specified controller does not exist"
     )
     web_app.handle_input("test_sid", json.dumps([0, {}]))
+
+
+def test_handle_macro_does_not_block_and_reports_id(web_app, mock_nxbt):
+    with patch.object(web_app, "_emit_to") as emit:
+        web_app.handle_macro("sid", json.dumps([0, "A 0.1s"]))
+
+    assert mock_nxbt.macro.call_args.kwargs["block"] is False
+    emit.assert_called_once_with("sid", "macro_started", "macro_id_123")
+
+
+def test_stop_and_clear_macros(web_app, mock_nxbt):
+    web_app.handle_stop_macro("sid", json.dumps([0, "macro_id_123"]))
+    web_app.handle_clear_macros("sid", 0)
+
+    mock_nxbt.stop_macro.assert_called_once_with(0, "macro_id_123", block=False)
+    mock_nxbt.clear_macros.assert_called_once_with(0)

@@ -669,3 +669,75 @@ Alert Dialog
 .alert-dialog-content button {
     min-width: 6rem;
 }
+
+/**************************************************/
+/* Macro status strip and tabs */
+/**************************************************/
+
+#macro-status {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    text-align: left;
+}
+
+#macro-status-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.macro-status-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+#macro-status button {
+    margin: 0;
+    padding: 0.5rem 1rem;
+}
+
+#macro-status button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 1rem;
+    border-bottom: 2px solid #3a4759;
+}
+
+.tabs .tab {
+    margin: 0;
+    padding: 0.75rem 1.25rem;
+    border-radius: 5px 5px 0 0;
+    background-color: #2c3544;
+    color: #d9dada;
+}
+
+.tabs .tab.active {
+    background-color: #3a4759;
+    color: #ffffff;
+}
+
+.tab-panel.controller-config-subsection {
+    min-width: 100%;
+    max-width: 100%;
+    margin: 0;
+}
+
+@media screen and (max-width: 960px) {
+    .tabs .tab {
+        flex: 1;
+        padding: 0.75rem 0.5rem;
+    }
+}

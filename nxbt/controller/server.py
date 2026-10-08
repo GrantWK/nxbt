@@ -77,6 +77,8 @@ class ControllerServer:
         # Initial reconnection overload protection
         self.tick = 1
         self.cached_msg = ""
+        # Last macro status written to the shared state (for the web UI)
+        self._macro_status = None
 
     def is_running(self):
         if self.state["state"] == "removing":
@@ -227,6 +229,7 @@ class ControllerServer:
                 itr, ctrl = self.save_connection()
                 next_tick = time.perf_counter()
 
+            self._publish_macro_status()
             next_tick = self._sleep_until_next_tick(next_tick)
             self.tick += 1
 
@@ -237,6 +240,14 @@ class ControllerServer:
                 mean_time = stat.mean(self.times)
 
                 self.logger.debug(f"Tick: {self.tick}, Mean Time: {str(1 / mean_time)}")
+
+    def _publish_macro_status(self):
+        """Shares macro progress with the web UI. Runs after the report is
+        sent and only writes on change, so it never delays an input."""
+        status = self.input.macro_status()
+        if status != self._macro_status:
+            self._macro_status = status
+            self.state["macro_status"] = status
 
     def _sleep_until_next_tick(self, next_tick):
         """Sleeps until the next tick deadline, waking early if a macro step

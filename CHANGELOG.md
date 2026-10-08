@@ -8,6 +8,11 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 
 ## [Unreleased]
 
+### Added
+- Web UI: controller page split into Input, Macros, Mapping and Controller
+  tabs, with a macro status strip (current step, steps left, Stop, Clear all)
+  that stays visible while scrolling and switching tabs.
+
 ### Security
 - The web app now listens on `127.0.0.1` by default (was `0.0.0.0`, every
   network interface), accepts Socket.IO connections only from its own origin
@@ -22,6 +27,8 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- Running a macro from the web UI no longer freezes the web server until the
+  macro finishes; status updates and live input keep working while it runs.
 - The controller loop now ticks at a steady 132 Hz (it alternated ~0 ms and
   ~7.6 ms ticks, ~255 Hz), and wakes exactly at macro step boundaries: steps
   are applied within ~0.1 ms of schedule instead of ~3.4 ms late, and timing

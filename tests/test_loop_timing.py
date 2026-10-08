@@ -144,3 +144,24 @@ def test_wait_for_connection_sleeps_between_checks():
     with patch("nxbt.nxbt.time.sleep", side_effect=connect) as sleep:
         nx.wait_for_connection(0)
     sleep.assert_called()
+
+
+def test_macro_status_while_running_and_idle():
+    parser, clock = parser_with_clock()
+    assert parser.macro_status() is None
+    with patch("nxbt.controller.input.perf_counter", clock):
+        parser.buffer_macro("A 0.05s\nB 0.05s\n", "m1")
+        parser.set_protocol_input()
+
+    assert parser.macro_status() == {"id": "m1", "step": "A 0.05s", "steps_left": 1, "queued": 0}
+
+
+def test_macro_status_published_only_on_change():
+    server = make_server()
+    server.state = MagicMock()
+    server.input.macro_status = MagicMock(side_effect=[None, {"id": "m1"}, {"id": "m1"}, None])
+
+    for _ in range(4):
+        server._publish_macro_status()
+
+    assert server.state.__setitem__.call_count == 2  # started, then finished

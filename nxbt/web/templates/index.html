@@ -110,7 +110,19 @@
                         <div class="control-indicator hidden" id="pc_zr"></div>
                     </div>
                 </div>
-                <div id="controller-input" class="controller-config-subsection">
+                <div id="macro-status" class="surface-lighter">
+                    <span class="macro-status-label">Macro</span>
+                    <span id="macro-status-text" class="mono">Idle</span>
+                    <button id="macro-stop-button" onclick="stopMacro()" disabled>Stop</button>
+                    <button onclick="clearMacros()">Clear all</button>
+                </div>
+                <nav class="tabs" role="tablist">
+                    <button class="tab active" role="tab" data-tab="input" onclick="showTab('input')">Input</button>
+                    <button class="tab" role="tab" data-tab="macros" onclick="showTab('macros')">Macros</button>
+                    <button class="tab" role="tab" data-tab="mapping" onclick="showTab('mapping')">Mapping</button>
+                    <button class="tab" role="tab" data-tab="controller" onclick="showTab('controller')">Controller</button>
+                </nav>
+                <div id="tab-input" class="tab-panel controller-config-subsection" role="tabpanel">
                     <h2 class="surface-lighter">Input Device</h2>
                     <select id="input-device" name="Select an Input Device" onchange="changeInput(event)">
                         <option value="keyboard">Keyboard</option>
@@ -136,6 +148,8 @@
                         "requestAnimationFrame()" function, rather than 
                         "setTimeout()".
                     </p>
+                </div>
+                <div id="tab-mapping" class="tab-panel controller-config-subsection hidden" role="tabpanel">
                     <h2 class="surface-lighter">Control Mapping</h2>
                     <div id="keyboard-map" class="surface-lighter">
                         <table>
@@ -196,12 +210,13 @@
                         </p>
                     </div>
                 </div>
-                <div id="controller-commands" class="controller-config-subsection">
+                <div id="tab-controller" class="tab-panel controller-config-subsection hidden" role="tabpanel">
                     <h2 class="surface-lighter">Controller Commands</h2>
                     <button onclick="shutdownController()">Shutdown Controller</button>
                     <button onclick="recreateProController()">Recreate Controller</button>
                     <button onclick="restartController()">Restart Controller</button>
-
+                </div>
+                <div id="tab-macros" class="tab-panel controller-config-subsection hidden" role="tabpanel">
                     <h2 class="surface-lighter">Controller Macro</h2>
                     <p>
                         <strong>Note:</strong> the main input device will override a running
@@ -228,7 +243,7 @@
             </div>
 
             <footer>
-                <p>Source Code and Documentation Available <a href="https://github.com/typenoob/nxbt" target="_blank">Here</a></p>
+                <p>Source Code and Documentation Available <a href="https://github.com/GrantWK/nxbt" target="_blank">Here</a></p>
                 <p>Made By <a href="http://github.com/Brikwerk" target="_blank">Reece Walsh</a> and <a href="http://github.com/typenoob" target="_blank">Coyote</a></p>
             </footer>
         </main>

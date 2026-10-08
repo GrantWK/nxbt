@@ -824,6 +824,7 @@ class _ControllerManager:
         controller_state["type"] = str(controller_type)
         controller_state["adapter_path"] = adapter_path
         controller_state["last_connection"] = None
+        controller_state["macro_status"] = None
 
         self._controller_queues[index] = controller_queue
 
