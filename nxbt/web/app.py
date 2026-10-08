@@ -9,6 +9,7 @@ import socketio
 import uvicorn
 from engineio.payload import Payload
 from starlette.applications import Starlette
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
@@ -34,6 +35,18 @@ PERMISSIONS_REQUIRED_MESSAGE = (
     "because NXBT does not have the required permissions.\n\n" + GRANT_CAPS_HINT
 )
 
+DEFAULT_IP = "127.0.0.1"
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
+def allowed_hosts(ip):
+    """Host headers the web app answers to. Rejecting any other host blocks
+    DNS rebinding, where a malicious site's domain resolves to this machine
+    so the browser treats its requests as same-origin."""
+    if ip in ("0.0.0.0", "::"):
+        return ["*"]
+    return sorted({ip, *LOOPBACK_HOSTS})
+
 
 class WebApp:
     def __init__(self, nxbt=None, *, debug=False, backend="bumble"):
@@ -49,8 +62,8 @@ class WebApp:
 
         self.templates = Jinja2Templates(directory=templates_dir)
         self.app = self._create_app(static_dir)
+        # cors_allowed_origins is left at its default: same origin only
         self.sio = socketio.AsyncServer(
-            cors_allowed_origins="*",
             async_mode="asgi",
             ping_timeout=60,
             ping_interval=25,
@@ -215,9 +228,13 @@ class WebApp:
         except ValueError:
             pass
 
+    def app_for(self, ip):
+        """The ASGI app to serve when bound to `ip`."""
+        return TrustedHostMiddleware(self.asgi_app, allowed_hosts=allowed_hosts(ip))
+
     def run(
         self,
-        ip="0.0.0.0",
+        ip=DEFAULT_IP,
         port=8000,
         usessl=False,
         cert_path=None,
@@ -251,7 +268,13 @@ class WebApp:
             uvicorn_kwargs["ssl_keyfile"] = key_path
             uvicorn_kwargs["ssl_certfile"] = cert_path
 
-        uvicorn.run(self.asgi_app, **uvicorn_kwargs)
+        if ip not in LOOPBACK_HOSTS:
+            print(
+                f"WARNING: the web app is listening on {ip}, so other devices on "
+                "your network can reach it. It has no login: anyone who can open "
+                "it can control your Switch."
+            )
+        uvicorn.run(self.app_for(ip), **uvicorn_kwargs)
 
     def _resolve_ssl_paths(self, cert_path):
         if cert_path is None:
@@ -286,7 +309,7 @@ class WebApp:
 
 
 def start_web_app(
-    ip="0.0.0.0", port=8000, usessl=False, cert_path=None, debug=False, backend="bumble"
+    ip=DEFAULT_IP, port=8000, usessl=False, cert_path=None, debug=False, backend="bumble"
 ):
     WebApp(debug=debug, backend=backend).run(
         ip=ip, port=port, usessl=usessl, cert_path=cert_path, debug=debug

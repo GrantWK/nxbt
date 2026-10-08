@@ -9,6 +9,11 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Security
+- The web app now listens on `127.0.0.1` by default (was `0.0.0.0`, every
+  network interface), accepts Socket.IO connections only from its own origin
+  (was any website), and rejects unexpected `Host` headers to block DNS
+  rebinding. Binding to another address prints a warning, since the web app
+  has no login.
 - Never set file capabilities on the Python interpreter. Previously every
   `nxbt` run as root called `setcap cap_net_admin,cap_net_bind_service+eip`
   on `/proc/self/exe`; outside a compiled binary that is the system Python

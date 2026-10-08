@@ -33,7 +33,7 @@ Install into a virtual environment (Python 3.10+):
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install .
-sudo .venv/bin/nxbt webapp -i 127.0.0.1
+sudo .venv/bin/nxbt webapp
 ```
 
 Or build and run the Docker image (Linux hosts only; containers cannot reach the
@@ -41,12 +41,13 @@ Bluetooth adapter through Docker Desktop on macOS/Windows):
 
 ```sh
 docker build -t nxbt -f docker/gnu/Dockerfile .
-docker run --rm -it --network host --cap-add=NET_ADMIN nxbt webapp -i 127.0.0.1
+docker run --rm -it --network host --cap-add=NET_ADMIN nxbt webapp
 ```
 
 `--network host` is required because Linux only allows Bluetooth sockets in the
-host network namespace. `-i 127.0.0.1` keeps the web app off other interfaces;
-it binds to `0.0.0.0` by default.
+host network namespace. The web app listens on `127.0.0.1` (this machine only) by
+default; pass `-i <LAN IP>` to reach it from other devices. It has no login, so
+only do that on a network you trust.
 
 See [Permissions](#permissions) for running without `sudo`.
 
@@ -84,7 +85,7 @@ nxbt checks the *effective* capabilities of its own process, so any of these wor
   ```ini
   [Service]
   User=nxbt
-  ExecStart=/path/to/.venv/bin/nxbt webapp -i 127.0.0.1
+  ExecStart=/path/to/.venv/bin/nxbt webapp
   AmbientCapabilities=CAP_NET_ADMIN
   CapabilityBoundingSet=CAP_NET_ADMIN
   ```
