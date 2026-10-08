@@ -4,13 +4,11 @@ import socket
 import threading
 import xml.etree.ElementTree as ET
 
-from bumble.core import UUID, ConnectionError
+from bumble.core import UUID, BaseBumbleError, ConnectionError
 from bumble.device import Device
 from bumble.hci import (
     HCI_AUTHENTICATION_FAILURE_ERROR,
-    HCI_CONNECTION_ALREADY_EXISTS_ERROR,
     HCI_CONNECTION_REJECTED_DUE_TO_UNACCEPTABLE_BD_ADDR_ERROR,
-    HCI_PAGE_TIMEOUT_ERROR,
     HCI_Error,
     HCI_Write_Default_Link_Policy_Settings_Command,
 )
@@ -25,7 +23,7 @@ from .internal.mgmt import MgmtClient
 from ..controller.controller import ControllerTypes
 from ..controller.sdp import SWITCH_CONTROLLER_SDP
 from ..setcap import has_cap_net_admin
-from .base import AdapterAvailability, Backend
+from .base import AdapterAvailability, Backend, PairingRequired
 
 HID_CONTROL_PSM = 0x0011
 HID_INTERRUPT_PSM = 0x0013
@@ -291,6 +289,8 @@ class BumbleBackend(Backend):
         # Save old hci state to restore
         self._hci_old_state = None
         self._future = None
+        # Device the HID L2CAP servers are registered on (once per device)
+        self._l2cap_servers_device = None
 
     @property
     def address(self) -> str:
@@ -591,9 +591,9 @@ class BumbleBackend(Backend):
         self._ctrl_future = self._loop.create_future()
         self._itr_future = self._loop.create_future()
 
-        # Register L2CAP servers — if PSMs are already registered from a
-        # previous failed setup, reset the device and retry.
-        try:
+        # Register the HID L2CAP servers once per device: their handlers read
+        # the current futures, and registering again raises "PSM already in use".
+        if self._l2cap_servers_device is not self._device:
             self._device.create_l2cap_server(
                 spec=ClassicChannelSpec(psm=HID_CONTROL_PSM),
                 handler=lambda ch: self._on_l2cap_connection(HID_CONTROL_PSM, ch),
@@ -602,14 +602,12 @@ class BumbleBackend(Backend):
                 spec=ClassicChannelSpec(psm=HID_INTERRUPT_PSM),
                 handler=lambda ch: self._on_l2cap_connection(HID_INTERRUPT_PSM, ch),
             )
-        except Exception as e:
-            self.logger.debug(f"L2CAP server registration failed: {e}")
-            raise
+            self._l2cap_servers_device = self._device
 
         try:
             ctrl = self._run_async(asyncio.wait_for(self._ctrl_future, 120))
             itr = self._run_async(asyncio.wait_for(self._itr_future, 120))
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, asyncio.TimeoutError):
             return None, None
 
         return itr, ctrl
@@ -649,19 +647,17 @@ class BumbleBackend(Backend):
             self._bridges.clear()
             try:
                 itr_bridge, ctrl_bridge = self._run_async(create_bridges(address))
+            # Callers retry OSError (e.g. page timeout while the Switch sleeps)
+            # and re-pair on PairingRequired.
             except (HCI_Error, ConnectionError) as e:
                 if e.error_code in (
-                    HCI_CONNECTION_ALREADY_EXISTS_ERROR,
-                    HCI_PAGE_TIMEOUT_ERROR,
-                ):
-                    raise OSError(
-                        "You may reconnect on the pair sceeen, force to repair"
-                    )
-                elif e.error_code in (
                     HCI_AUTHENTICATION_FAILURE_ERROR,
                     HCI_CONNECTION_REJECTED_DUE_TO_UNACCEPTABLE_BD_ADDR_ERROR,
                 ):
-                    raise OSError("Your bonded device is untrusted, force to repair")
+                    raise PairingRequired(f"Switch rejected the bond: {e}") from e
+                raise OSError(f"Reconnect to {address} failed: {e}") from e
+            except (BaseBumbleError, asyncio.TimeoutError) as e:
+                raise OSError(f"Reconnect to {address} failed: {e}") from e
             self._bridges.append(itr_bridge)
             itr = _BumbleSocket(itr_bridge.socket, address, local_addr)
             itr._bridge = itr_bridge
