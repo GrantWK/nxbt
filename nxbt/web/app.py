@@ -103,6 +103,8 @@ class WebApp:
         self.sio.on("web_create_pro_controller")(self.on_create_controller)
         self.sio.on("input")(self.handle_input)
         self.sio.on("macro")(self.handle_macro)
+        self.sio.on("stop_macro")(self.handle_stop_macro)
+        self.sio.on("clear_macros")(self.handle_clear_macros)
 
     def _run_async(self, coro, *, wait=True):
         """Run a coroutine from sync Socket.IO handlers."""
@@ -220,11 +222,24 @@ class WebApp:
             pass
 
     def handle_macro(self, sid, message):
-        message = json.loads(message)
-        index = message[0]
-        macro = message[1]
+        index, macro = json.loads(message)
         try:
-            self.nxbt.macro(index, macro)
+            # Don't block: this handler runs on the server's event loop
+            macro_id = self.nxbt.macro(index, macro, block=False)
+        except ValueError:
+            return
+        self._emit_to(sid, "macro_started", macro_id)
+
+    def handle_stop_macro(self, sid, message):
+        index, macro_id = json.loads(message)
+        try:
+            self.nxbt.stop_macro(index, macro_id, block=False)
+        except ValueError:
+            pass
+
+    def handle_clear_macros(self, sid, index):
+        try:
+            self.nxbt.clear_macros(index)
         except ValueError:
             pass
 
