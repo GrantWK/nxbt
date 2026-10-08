@@ -1,0 +1,9 @@
+# Moves the HOME menu cursor right 5 times and back. A safe way to check
+# that input reaches the Switch.
+# Before you start: open the HOME menu (not inside a game).
+LOOP 5
+    DPAD_RIGHT 0.1s
+    0.3s
+LOOP 5
+    DPAD_LEFT 0.1s
+    0.3s

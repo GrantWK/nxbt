@@ -81,6 +81,27 @@ LOOP 100
 
 Note, a macro line starting with `#` is ignored.
 
+### Library macros
+
+The web app's **Library** tab lists macros by game. Each macro is a text file
+at `<game>/<name>.txt`; the file name is its title. Start the file with `#`
+lines describing it; the Library shows them:
+
+```
+# Mashes A until stopped.
+# Before you start: be where A should be pressed. Waits 5 s first.
+5s
+LOOP 100000
+    A 0.4s
+    0.05s
+```
+
+Built-in macros live in `nxbt/library/builtin/` and are read-only. Macros you
+save from the web app go to `~/.local/share/nxbt/library/` (your folder even
+when nxbt runs with `sudo`) and replace a built-in macro with the same game and
+name. Game and macro names may use letters, digits, spaces and `& ' ( ) , . + -`
+(no `:` or `/`, so the files work on every OS).
+
 ## Macro Control Values
 
 | Macro Value | Control Name |

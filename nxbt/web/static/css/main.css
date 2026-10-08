@@ -741,3 +741,66 @@ Alert Dialog
         padding: 0.75rem 0.5rem;
     }
 }
+
+/**************************************************/
+/* Library */
+/**************************************************/
+
+#library {
+    text-align: left;
+}
+
+#library-browser {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+#library-browser label {
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+#library-browser select {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+}
+
+#library-editor input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: #1a1f28;
+}
+
+#library-editor textarea {
+    width: 100%;
+    text-transform: none;
+}
+
+.library-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.25rem;
+}
+
+.library-actions button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.library-error {
+    color: #ff8a80;
+}
+
+@media screen and (max-width: 960px) {
+    #library-browser {
+        grid-template-columns: 1fr;
+    }
+}

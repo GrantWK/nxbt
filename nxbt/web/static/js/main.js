@@ -771,6 +771,9 @@ function updateMacroStatus() {
 /**********************************************/
 
 function showTab(name) {
+    if (name === "library") {
+        socket.emit('library_list');
+    }
     for (let tab of document.querySelectorAll(".tab")) {
         let active = tab.dataset.tab === name;
         tab.classList.toggle("active", active);
@@ -831,4 +834,150 @@ const measureTimeoutLatency = {
             context.timeOld = timeNew;
         } 
     }
+}
+
+/**********************************************/
+/* Library */
+/**********************************************/
+
+let LIBRARY = [];
+let LIBRARY_GAME = null;
+let LIBRARY_MACRO = null;
+let LIBRARY_SAVING = false;
+const HTML_LIBRARY_GAMES = document.getElementById("library-games");
+const HTML_LIBRARY_MACROS = document.getElementById("library-macros");
+const HTML_LIBRARY_GAME = document.getElementById("library-game");
+const HTML_LIBRARY_NAME = document.getElementById("library-name");
+const HTML_LIBRARY_TEXT = document.getElementById("library-text");
+const HTML_LIBRARY_INFO = document.getElementById("library-info");
+const HTML_LIBRARY_MESSAGE = document.getElementById("library-message");
+const HTML_LIBRARY_DELETE = document.getElementById("library-delete-button");
+
+socket.on('library', function(games) {
+    LIBRARY = games;
+    renderLibrary();
+});
+
+socket.on('library_macro', function(macro) {
+    showLibraryMacro(macro);
+    if (LIBRARY_SAVING) {
+        setLibraryMessage("Saved to your library.");
+        LIBRARY_SAVING = false;
+    }
+});
+
+socket.on('library_error', function(message) {
+    LIBRARY_SAVING = false;
+    setLibraryMessage(message, true);
+});
+
+function option(value, text, selected) {
+    let element = document.createElement("option");
+    element.value = value;
+    element.textContent = text;
+    element.selected = selected;
+    return element;
+}
+
+function renderLibrary() {
+    if (!LIBRARY.some(g => g.game === LIBRARY_GAME)) {
+        LIBRARY_GAME = LIBRARY.length ? LIBRARY[0].game : null;
+    }
+    HTML_LIBRARY_GAMES.replaceChildren(
+        ...LIBRARY.map(g => option(g.game, g.game, g.game === LIBRARY_GAME))
+    );
+    let game = LIBRARY.find(g => g.game === LIBRARY_GAME);
+    let macros = game ? game.macros : [];
+    let groups = [option("", "Choose a macro…", !LIBRARY_MACRO)];
+    for (let [source, label] of [["builtin", "Built-in"], ["user", "Personal"]]) {
+        let matching = macros.filter(m => m.source === source);
+        if (!matching.length) {
+            continue;
+        }
+        let group = document.createElement("optgroup");
+        group.label = label;
+        for (let m of matching) {
+            let element = option(m.name, m.name, m.name === LIBRARY_MACRO);
+            element.title = m.description;
+            group.appendChild(element);
+        }
+        groups.push(group);
+    }
+    HTML_LIBRARY_MACROS.replaceChildren(...groups);
+}
+
+function selectLibraryGame(game) {
+    LIBRARY_GAME = game;
+    newLibraryMacro();
+}
+
+function selectLibraryMacro(name) {
+    if (name) {
+        socket.emit('library_get', JSON.stringify([LIBRARY_GAME, name]));
+    } else {
+        newLibraryMacro();
+    }
+}
+
+function showLibraryMacro(macro) {
+    LIBRARY_GAME = macro.game;
+    LIBRARY_MACRO = macro.name;
+    renderLibrary();
+    HTML_LIBRARY_GAME.value = macro.game;
+    HTML_LIBRARY_NAME.value = macro.name;
+    HTML_LIBRARY_TEXT.value = macro.text;
+    let entry = (LIBRARY.find(g => g.game === macro.game) || {macros: []})
+        .macros.find(m => m.name === macro.name) || {};
+    HTML_LIBRARY_INFO.replaceChildren();
+    for (let [label, value] of [["", entry.description], ["Before you start: ", entry.setup]]) {
+        if (!value) {
+            continue;
+        }
+        let line = document.createElement("p");
+        let strong = document.createElement("strong");
+        strong.textContent = label;
+        line.append(strong, value);
+        HTML_LIBRARY_INFO.appendChild(line);
+    }
+    let builtin = macro.source === "builtin";
+    HTML_LIBRARY_DELETE.disabled = builtin;
+    setLibraryMessage(builtin ? "Built-in macro: saving keeps a personal copy." : "");
+}
+
+function setLibraryMessage(text, isError) {
+    HTML_LIBRARY_MESSAGE.textContent = text;
+    HTML_LIBRARY_MESSAGE.classList.toggle("library-error", Boolean(isError));
+}
+
+function runLibraryMacro() {
+    let macro = HTML_LIBRARY_TEXT.value.toUpperCase();
+    socket.emit('macro', JSON.stringify([NXBT_CONTROLLER_INDEX, macro]));
+    setLibraryMessage("Started; watch the status strip above.");
+}
+
+function saveLibraryMacro() {
+    LIBRARY_SAVING = true;
+    socket.emit('library_save', JSON.stringify(
+        [HTML_LIBRARY_GAME.value.trim(), HTML_LIBRARY_NAME.value.trim(), HTML_LIBRARY_TEXT.value]
+    ));
+}
+
+function deleteLibraryMacro() {
+    let game = HTML_LIBRARY_GAME.value.trim();
+    let name = HTML_LIBRARY_NAME.value.trim();
+    if (confirm(`Delete "${name}" from ${game}?`)) {
+        socket.emit('library_delete', JSON.stringify([game, name]));
+        newLibraryMacro();
+    }
+}
+
+function newLibraryMacro() {
+    LIBRARY_MACRO = null;
+    renderLibrary();
+    HTML_LIBRARY_GAME.value = LIBRARY_GAME || "";
+    HTML_LIBRARY_NAME.value = "";
+    HTML_LIBRARY_TEXT.value = "";
+    HTML_LIBRARY_INFO.replaceChildren();
+    HTML_LIBRARY_DELETE.disabled = true;
+    setLibraryMessage("");
 }
