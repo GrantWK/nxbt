@@ -17,11 +17,14 @@ wired-microcontroller project.
 ## Roadmap
 
 - [x] Build hygiene: PyPI-only dependencies, pip-based Docker images, permission fixes (see [CHANGELOG](CHANGELOG.md))
-- [ ] Measure Bluetooth timing on real hardware ([scripts/hw-measurements](scripts/hw-measurements))
-- [ ] Fix the controller loop's timing and busy-waits
-- [ ] Tests for the controller core
-- [ ] Web UI rework
-- [ ] Computer vision experiments
+- [ ] Measure Bluetooth timing on real hardware ([scripts/hw-measurements](scripts/hw-measurements), [#20](https://github.com/GrantWK/nxbt/issues/20))
+- [ ] Fix reconnect crashes and keep reconnecting while the Switch sleeps ([#2](https://github.com/GrantWK/nxbt/issues/2), [#8](https://github.com/GrantWK/nxbt/issues/8))
+- [ ] Fix the controller loop's timing and busy-waits ([#5](https://github.com/GrantWK/nxbt/issues/5), [#7](https://github.com/GrantWK/nxbt/issues/7))
+- [ ] Tests for the controller core ([#12](https://github.com/GrantWK/nxbt/issues/12))
+- [ ] Web UI rework ([#13](https://github.com/GrantWK/nxbt/issues/13))
+- [ ] Computer vision experiments ([#14](https://github.com/GrantWK/nxbt/issues/14))
+
+Full backlog: [GitHub Issues](https://github.com/GrantWK/nxbt/issues).
 
 ## Quick Start
 
