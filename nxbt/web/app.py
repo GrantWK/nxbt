@@ -261,26 +261,26 @@ class WebApp:
         self._emit_to(sid, "library", self.library.list())
 
     def handle_library_get(self, sid, message):
-        game, name = json.loads(message)
+        folder, name = json.loads(message)
         try:
-            self._emit_to(sid, "library_macro", self.library.get(game, name))
+            self._emit_to(sid, "library_macro", self.library.get(folder, name))
         except (ValueError, OSError) as e:
             self._emit_to(sid, "library_error", str(e))
 
     def handle_library_save(self, sid, message):
-        game, name, text = json.loads(message)
+        folder, name, text = json.loads(message)
         try:
-            self.library.save(game, name, text)
+            folder = self.library.save(folder, name, text)
         except (ValueError, OSError) as e:
             self._emit_to(sid, "library_error", str(e))
             return
         self._emit_to(sid, "library", self.library.list())
-        self._emit_to(sid, "library_macro", self.library.get(game, name))
+        self._emit_to(sid, "library_macro", self.library.get(folder, name))
 
     def handle_library_delete(self, sid, message):
-        game, name = json.loads(message)
+        folder, name = json.loads(message)
         try:
-            self.library.delete(game, name)
+            self.library.delete(folder, name)
         except (ValueError, OSError) as e:
             self._emit_to(sid, "library_error", str(e))
             return

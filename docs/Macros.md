@@ -128,9 +128,12 @@ lines), **Shift+Tab** unindents, and **Esc** leaves the editor.
 
 ### Library macros
 
-The web app's **Library** tab lists macros by game. Each macro is a text file
-at `<game>/<name>.txt`; the file name is its title. Start the file with `#`
-lines describing it; the Library shows them:
+The web app's **Library** tab lists macros in folders. Each macro is a text
+file at `<folder>/<name>.txt`; the file name is its title. Folders can nest up
+to 4 levels deep: type the path with `/` between levels, for example
+`Pokémon Legends Z-A/Wild zones`, or leave it blank to save at the top level.
+Folders are created when you save into them and removed when their last macro
+is deleted. Start the file with `#` lines describing it; the Library shows them:
 
 ```
 # Mashes A until stopped.
@@ -142,9 +145,9 @@ LOOP FOREVER
 
 Built-in macros live in `nxbt/library/builtin/` and are read-only. Macros you
 save from the web app go to `~/.local/share/nxbt/library/` (your folder even
-when nxbt runs with `sudo`) and replace a built-in macro with the same game and
-name. Game and macro names may use letters, digits, spaces and `& ' ( ) , . + -`
-(no `:` or `/`, so the files work on every OS).
+when nxbt runs with `sudo`) and replace a built-in macro with the same folder
+and name. Folder and macro names may use letters, digits, spaces and
+`& ' ( ) , . + -` (no `:` or `/` inside a name, so the files work on every OS).
 
 ### Recording macros
 

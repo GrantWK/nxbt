@@ -153,15 +153,15 @@
                 <div id="tab-library" class="tab-panel controller-config-subsection hidden" role="tabpanel">
                     <div id="library">
                         <div id="library-browser" class="surface-lighter">
-                            <label>Game
-                                <select id="library-games" onchange="selectLibraryGame(this.value)"></select>
+                            <label>Folder
+                                <select id="library-folders" class="mono" onchange="selectLibraryFolder(this.value)"></select>
                             </label>
                             <label>Macro
                                 <select id="library-macros" onchange="selectLibraryMacro(this.value)"></select>
                             </label>
                         </div>
                         <div id="library-editor">
-                            <input id="library-game" type="text" placeholder="Game" aria-label="Game" onfocus="disableKeyHandlers()" onblur="enableKeyHandlers()">
+                            <input id="library-folder" type="text" placeholder="Folder, e.g. Game/Area (blank = top level)" aria-label="Folder" onfocus="disableKeyHandlers()" onblur="enableKeyHandlers()">
                             <input id="library-name" type="text" placeholder="Macro name" aria-label="Macro name" onfocus="disableKeyHandlers()" onblur="enableKeyHandlers()">
                             <div id="library-info"></div>
                             <textarea id="library-text" class="mono" placeholder="# What the macro does.&#10;# Before you start: where to be first.&#10;A 0.1s" onfocus="disableKeyHandlers()" onblur="enableKeyHandlers()"></textarea>

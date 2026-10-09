@@ -65,9 +65,10 @@ has paired with before. Then:
 - **Input**: control the Switch with a keyboard or gamepad, and set how often
   input is sampled.
 - **Macros**: type a macro and run it.
-- **Library**: macros grouped by game, each with what it does and where to
-  start it. Run, edit and save your own, or **Record** what you play and save
-  it as a macro (optionally repeated). Yours are stored in
+- **Library**: macros in folders (up to 4 levels, e.g. game, then area), each
+  with what it does and where to start it. Run, edit and save your own, or
+  **Record** what you play and save it as a macro (optionally repeated). Yours
+  are stored in
   `~/.local/share/nxbt/library/`.
 - **Mapping**: the keyboard controls.
 - **Controller**: shut down, recreate or restart the emulated controller.
