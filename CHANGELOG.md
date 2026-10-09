@@ -9,6 +9,9 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Added
+- While a controller exists, nxbt blocks system suspend (a logind "sleep"
+  inhibitor via `systemd-inhibit`) so long macros aren't cut off. The screen
+  can still blank and lock. The inhibitor ends with nxbt, even if it crashes.
 - Record macros in the web UI: press Record, play with keyboard or gamepad,
   and the inputs become macro text in the Library editor, optionally wrapped
   in `LOOP 10`, `LOOP 30m` or `LOOP FOREVER`.
