@@ -107,3 +107,9 @@ def test_web_reports_invalid_names(library):
         app.handle_library_save("sid", json.dumps(["General", "../x", "A 0.1s\n"]))
 
     assert emit.call_args.args[1] == "library_error"
+
+
+def test_invalid_macros_are_not_saved(library):
+    with pytest.raises(ValueError, match="Line 2"):
+        library.save("General", "Typo", "A\nHOM\n")
+    assert not (library.user_dir / "General" / "Typo.txt").exists()

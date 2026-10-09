@@ -156,8 +156,7 @@ class ControllerServer:
         except Exception as e:
             self.state["state"] = "crashed"
             self.state["errors"] = str(e)
-            self.logger.debug("Error during connecting:")
-            self.logger.debug(self.state["errors"])
+            self.logger.error(f"Controller crashed: {e}\n{traceback.format_exc()}")
             return self.state
 
     def mainloop(self, itr, ctrl):

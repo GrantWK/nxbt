@@ -824,3 +824,7 @@ Alert Dialog
 #record-button.recording {
     background-color: #ff8a80;
 }
+
+#macro-status-text.macro-error {
+    color: #ff8a80;
+}

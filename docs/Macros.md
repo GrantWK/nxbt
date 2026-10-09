@@ -19,6 +19,28 @@ B 0.1s
 
 This is effectively a single B button press. NXBT will then wait 1 second before moving to the next action.
 
+The duration is optional: a line without one is held for **0.1s**, so these two
+macros are the same:
+
+```
+HOME
+1s
+```
+
+```
+HOME 0.1s
+1s
+```
+
+Note that two input lines in a row with the same buttons are one continuous
+press (`A` then `A` holds A for 0.2s). Put a wait line between them for two
+separate presses.
+
+Button and stick names aren't case-sensitive. Macros are checked before they
+run: an unknown input, a bad time or a bad `LOOP` is reported with its line
+number (for example `Line 3: 'HOM' is not a button, stick or time`) and the
+macro doesn't start.
+
 ### Advanced Macros
 
 To set multiple inputs simultaneously, we write our inputs on the same line, separated by a space, followed by the duration. This is how our script looks now.

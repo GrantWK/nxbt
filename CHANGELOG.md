@@ -9,6 +9,9 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
 ## [Unreleased]
 
 ### Added
+- Macro steps without a time are held for 0.1s (`HOME` = `HOME 0.1s`), and
+  button names aren't case-sensitive. Macros are checked before running and
+  before saving to the Library: mistakes are reported with their line number.
 - While a controller exists, nxbt blocks system suspend (a logind "sleep"
   inhibitor via `systemd-inhibit`) so long macros aren't cut off. The screen
   can still blank and lock. The inhibitor ends with nxbt, even if it crashes.
@@ -44,6 +47,9 @@ Based on [typenoob/nxbt](https://github.com/typenoob/nxbt) `develop` at
   not a compiled nxbt binary.
 
 ### Fixed
+- A macro step without a time (e.g. `HOME`) or with an unknown button no longer
+  crashes the controller. Controller crashes are now logged as errors with a
+  traceback and shown in the web UI after connecting, not only during it.
 - After the controller loop stalls (e.g. reconnecting while the Switch
   sleeps), a running macro resumes at normal speed instead of firing every
   missed step for one tick each (39 input changes in 0.3 s after a 10 s

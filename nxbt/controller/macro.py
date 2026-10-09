@@ -18,6 +18,16 @@ _DURATION_PART = re.compile(r"(\d+(?:\.\d+)?)([smhd])", re.IGNORECASE)
 _DURATION = re.compile(r"(?:\d+(?:\.\d+)?[smhd])+", re.IGNORECASE)
 _UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 
+# A step with no time is held for this long ("A" means "A 0.1s")
+DEFAULT_STEP = "0.1s"
+BUTTONS = frozenset({
+    "A", "B", "X", "Y", "L", "R", "ZL", "ZR", "PLUS", "MINUS", "HOME", "CAPTURE",
+    "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+    "L_STICK_PRESS", "R_STICK_PRESS", "JCL_SL", "JCL_SR", "JCR_SL", "JCR_SR",
+})
+_STEP_TIME = re.compile(r"(\d+(?:\.\d+)?)s", re.IGNORECASE)
+_STICK = re.compile(r"([LR])_STICK@([+-])(\d{3})([+-])(\d{3})", re.IGNORECASE)
+
 
 class Duration(float):
     """A loop length in seconds (from LOOP 30m etc.)."""
@@ -26,41 +36,66 @@ class Duration(float):
 def parse_macro(text, clock=time.perf_counter):
     """Parses macro text into a MacroSteps cursor.
 
-    :raises ValueError: if a LOOP line has an invalid count or time
+    :raises ValueError: naming the line of an unknown input, a bad time or a
+        bad LOOP
     """
     lines = [
-        line
-        for line in text.split("\n")
+        (number, line)
+        for number, line in enumerate(text.split("\n"), 1)
         if line.strip() and not line.strip().startswith("#")
     ]
     return MacroSteps(_parse_block(lines), clock)
 
 
+def _parse_step(number, line):
+    """Checks a step line and returns it normalized: uppercase inputs and an
+    explicit time, e.g. "a l_stick@+000+100" -> "A L_STICK@+000+100 0.1s"."""
+    tokens = line.split()
+    time_token = DEFAULT_STEP
+    if _STEP_TIME.fullmatch(tokens[-1]):
+        time_token = tokens.pop().lower()
+    for token in tokens:
+        stick = _STICK.fullmatch(token)
+        if stick:
+            if int(stick.group(3)) > 100 or int(stick.group(5)) > 100:
+                raise ValueError(f"Line {number}: stick values go from -100 to +100 in {token!r}")
+        elif token.upper() not in BUTTONS:
+            raise ValueError(
+                f"Line {number}: {token!r} is not a button, stick or time "
+                "(e.g. A, DPAD_UP, L_STICK@+000+100, 0.5s)"
+            )
+    return " ".join([token.upper() for token in tokens] + [time_token])
+
+
 def _parse_block(lines):
-    """Turns lines into a list of step strings and (count, body) loops.
+    """Turns (line number, text) pairs into a list of step strings and
+    (count, body) loops.
     Loops without any steps inside are dropped, so iteration always ends or
     produces a step."""
     block = []
     i = 0
     while i < len(lines):
-        line = lines[i]
+        number, line = lines[i]
         i += 1
-        if not line.startswith("LOOP"):
-            block.append(line)
+        if line.split()[0].upper() != "LOOP":
+            block.append(_parse_step(number, line))
             continue
 
-        count = _loop_count(line)
+        try:
+            count = _loop_count(line)
+        except ValueError as e:
+            raise ValueError(f"Line {number}: {e}") from None
         # The loop body is the following lines indented by the delimiter the
         # first body line uses (tab, 4 spaces or 2 spaces).
         delimiter = "  "
         if i < len(lines):
-            if lines[i].startswith("\t"):
+            if lines[i][1].startswith("\t"):
                 delimiter = "\t"
-            elif lines[i].startswith("    "):
+            elif lines[i][1].startswith("    "):
                 delimiter = "    "
         body = []
-        while i < len(lines) and lines[i].startswith(delimiter):
-            body.append(lines[i].replace(delimiter, "", 1))
+        while i < len(lines) and lines[i][1].startswith(delimiter):
+            body.append((lines[i][0], lines[i][1].replace(delimiter, "", 1)))
             i += 1
         body = _parse_block(body)
         if body and count != 0:

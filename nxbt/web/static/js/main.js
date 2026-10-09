@@ -397,10 +397,10 @@ function displayError(errorText) {
     errorContainer.classList.add('error');
 
     let errorHeader = document.createElement('h1');
-    errorHeader.innerHTML = "ERROR";
+    errorHeader.textContent = "ERROR";
 
     let errorMessage = document.createElement('p');
-    errorMessage.innerHTML = errorText;
+    errorMessage.textContent = errorText;
 
     errorContainer.appendChild(errorHeader);
     errorContainer.appendChild(errorMessage);
@@ -467,6 +467,7 @@ function recreateProController() {
 }
 
 function restartController() {
+    CRASH_SHOWN = false;
     shutdownController();
     HTML_LOADER_RECREATE_WRAPPER.classList.add('hidden');
     HTML_ERROR_DISPLAY.classList.add('hidden');
@@ -514,6 +515,7 @@ function updateStatusIndicator() {
             changeStatusIndicatorState("indicator-yellow", "RECONNECTING");
         } else if (controller_state === ControllerState.CRASHED) {
             changeStatusIndicatorState("indicator-red", "CRASHED");
+            showCrashDialog(STATE[NXBT_CONTROLLER_INDEX].errors);
         }
     } else {
         changeStatusIndicatorState("indicator-red", "NO INPUT");
@@ -765,13 +767,38 @@ function formatDuration(seconds) {
     return parts.slice(0, 2).join(" ");
 }
 
+let MACRO_ERROR = null;  // {message, until}: shown in the status strip
+
+socket.on('macro_error', function(message) {
+    MACRO_ERROR = {message: message, until: Date.now() + 10000};
+    setLibraryMessage(`Not started: ${message}`, true);
+    updateMacroStatus();
+});
+
+let CRASH_SHOWN = false;
+
+function showCrashDialog(errors) {
+    if (CRASH_SHOWN) {
+        return;
+    }
+    CRASH_SHOWN = true;
+    HTML_ALERT_DIALOG_TITLE.textContent = "Controller crashed";
+    HTML_ALERT_DIALOG_MESSAGE.textContent =
+        `${errors || "Unknown error"}. Use Restart Controller in the Controller tab to reconnect. ` +
+        "Run nxbt with -d to see details in the terminal.";
+    HTML_ALERT_DIALOG.classList.remove('hidden');
+}
+
 function updateMacroStatus() {
     let status = currentMacroStatus();
     HTML_MACRO_STOP_BUTTON.disabled = !status;
+    let error = MACRO_ERROR && Date.now() < MACRO_ERROR.until ? MACRO_ERROR.message : null;
+    HTML_MACRO_STATUS_TEXT.classList.toggle("macro-error", Boolean(error) && !status);
     if (!status) {
-        HTML_MACRO_STATUS_TEXT.textContent = "Idle";
+        HTML_MACRO_STATUS_TEXT.textContent = error ? `Not started: ${error}` : "Idle";
         return;
     }
+    MACRO_ERROR = null;
     let progress = `${status.steps_left} steps left`;
     if (status.time_left !== null && status.time_left !== undefined) {
         progress = `about ${formatDuration(status.time_left)} left`;

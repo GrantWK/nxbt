@@ -178,3 +178,9 @@ def test_logging_flags_custom(mock_nxbt):
     main(["demo", "--logfile", "custom.log"])
     call_kwargs = mock_nxbt.call_args[1]
     assert call_kwargs["log_to_file"] == "custom.log"
+
+
+def test_macro_command_rejects_invalid_macro_before_connecting(mock_nxbt, capsys):
+    main(["macro", "-c", "HOM"])
+    assert "Invalid macro: Line 1" in capsys.readouterr().out
+    mock_nxbt.assert_not_called()

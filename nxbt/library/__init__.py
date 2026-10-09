@@ -15,6 +15,8 @@ import os
 import re
 from pathlib import Path
 
+from ..controller.macro import parse_macro
+
 BUILTIN_DIR = Path(__file__).parent / "builtin"
 MAX_MACRO_BYTES = 256 * 1024
 # Letters, digits and a few punctuation marks; no slashes, no leading dot
@@ -99,6 +101,7 @@ class Library:
         """Saves a user macro, replacing any with the same game and name."""
         if len(text.encode("utf-8")) > MAX_MACRO_BYTES:
             raise ValueError(f"Macro is larger than {MAX_MACRO_BYTES // 1024} KB")
+        parse_macro(text)  # raises ValueError naming the bad line
         path = self._path(self.user_dir, game, name)
         self._makedirs(path.parent)
         path.write_text(text, encoding="utf-8")
