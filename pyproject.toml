@@ -63,7 +63,7 @@ include = ["nxbt*"]
 
 [tool.setuptools.package-data]
 "nxbt.web" = ["templates/*.html", "static/**/*"]
-"nxbt.library" = ["builtin/*/*.txt"]
+"nxbt.library" = ["builtin/**/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
