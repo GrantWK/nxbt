@@ -22,6 +22,7 @@ from ..nxbt import Nxbt, PRO_CONTROLLER
 from ..backends import BACKENDS
 from ..library import Library
 from ..controller.recording import recording_to_macro
+from ..controller.macro import parse_macro
 from ..setcap import GRANT_CAPS_HINT
 
 # Polling payloads can batch many input packets; default limit (16) is too low.
@@ -231,6 +232,11 @@ class WebApp:
 
     def handle_macro(self, sid, message):
         index, macro = json.loads(message)
+        try:
+            parse_macro(macro)
+        except ValueError as e:
+            self._emit_to(sid, "macro_error", str(e))
+            return
         try:
             # Don't block: this handler runs on the server's event loop
             macro_id = self.nxbt.macro(index, macro, block=False)

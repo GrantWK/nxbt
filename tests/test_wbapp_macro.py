@@ -109,7 +109,7 @@ def test_controller_creation_no_adapters_detected(web_app, mock_nxbt):
 
 def test_handle_macro(web_app, mock_nxbt):
     """Test that handle_macro passes the correct args to nxbt.macro."""
-    macro_payload = json.dumps([0, "B 0.1s A 0.1s"])
+    macro_payload = json.dumps([0, "B 0.1s\nA 0.1s"])
     web_app.handle_macro("test_sid", macro_payload)
 
     mock_nxbt.macro.assert_called_once()
@@ -140,3 +140,12 @@ def test_stop_and_clear_macros(web_app, mock_nxbt):
 
     mock_nxbt.stop_macro.assert_called_once_with(0, "macro_id_123", block=False)
     mock_nxbt.clear_macros.assert_called_once_with(0)
+
+
+def test_invalid_macro_is_reported_not_run(web_app, mock_nxbt):
+    with patch.object(web_app, "_emit_to") as emit:
+        web_app.handle_macro("sid", json.dumps([0, "HOM\n"]))
+
+    mock_nxbt.macro.assert_not_called()
+    assert emit.call_args.args[1] == "macro_error"
+    assert emit.call_args.args[2].startswith("Line 1: ")

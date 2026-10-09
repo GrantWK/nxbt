@@ -6,6 +6,7 @@ import traceback
 from sys import exit
 
 from .setcap import IS_COMPILED, set_file_cap
+from .controller.macro import parse_macro
 from .nxbt import Nxbt, PRO_CONTROLLER
 from .backends import BACKENDS
 from .tui import InputTUI
@@ -371,6 +372,12 @@ def macro(args):
         print("No macro commands were specified.")
         print("Please use the -c argument to specify a macro string or a file location")
         print("to load a macro string from.")
+        return
+
+    try:
+        parse_macro(macro)
+    except ValueError as e:
+        print(f"Invalid macro: {e}")
         return
 
     backend = make_backend(args)

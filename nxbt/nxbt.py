@@ -16,6 +16,7 @@ from .controller import ControllerServer
 from .controller import ControllerTypes
 from .logger import create_logger
 from .power import SleepInhibitor
+from .controller.macro import parse_macro
 
 
 JOYCON_L = ControllerTypes.JOYCON_L
@@ -335,6 +336,10 @@ class Nxbt:
 
         if controller_index not in self.manager_state.keys():
             raise ValueError("Specified controller does not exist")
+
+        # Reject typos here, with the line number, rather than in the
+        # controller (which would skip the macro)
+        parse_macro(macro)
 
         # Get a unique ID to identify the macro
         # so we can check when the controller is done inputting it
