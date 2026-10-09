@@ -887,20 +887,20 @@ const measureTimeoutLatency = {
 /**********************************************/
 
 let LIBRARY = [];
-let LIBRARY_GAME = null;
+let LIBRARY_FOLDER = null;
 let LIBRARY_MACRO = null;
 let LIBRARY_SAVING = false;
-const HTML_LIBRARY_GAMES = document.getElementById("library-games");
+const HTML_LIBRARY_FOLDERS = document.getElementById("library-folders");
 const HTML_LIBRARY_MACROS = document.getElementById("library-macros");
-const HTML_LIBRARY_GAME = document.getElementById("library-game");
+const HTML_LIBRARY_FOLDER = document.getElementById("library-folder");
 const HTML_LIBRARY_NAME = document.getElementById("library-name");
 const HTML_LIBRARY_TEXT = document.getElementById("library-text");
 const HTML_LIBRARY_INFO = document.getElementById("library-info");
 const HTML_LIBRARY_MESSAGE = document.getElementById("library-message");
 const HTML_LIBRARY_DELETE = document.getElementById("library-delete-button");
 
-socket.on('library', function(games) {
-    LIBRARY = games;
+socket.on('library', function(folders) {
+    LIBRARY = folders;
     renderLibrary();
 });
 
@@ -925,15 +925,78 @@ function option(value, text, selected) {
     return element;
 }
 
-function renderLibrary() {
-    if (!LIBRARY.some(g => g.game === LIBRARY_GAME)) {
-        LIBRARY_GAME = LIBRARY.length ? LIBRARY[0].game : null;
+/** Every folder path in the library, parents included, in tree order. */
+function libraryFolderPaths() {
+    let paths = new Set();
+    for (let f of LIBRARY) {
+        let parts = f.folder ? f.folder.split("/") : [];
+        for (let depth = parts.length; depth >= 0; depth--) {
+            paths.add(parts.slice(0, depth).join("/"));
+        }
     }
-    HTML_LIBRARY_GAMES.replaceChildren(
-        ...LIBRARY.map(g => option(g.game, g.game, g.game === LIBRARY_GAME))
-    );
-    let game = LIBRARY.find(g => g.game === LIBRARY_GAME);
-    let macros = game ? game.macros : [];
+    let key = path => path.toLowerCase().split("/");
+    return [...paths].sort((a, b) => {
+        let [ka, kb] = [key(a), key(b)];
+        for (let i = 0; i < Math.min(ka.length, kb.length); i++) {
+            if (ka[i] !== kb[i]) {
+                return ka[i] < kb[i] ? -1 : 1;
+            }
+        }
+        return ka.length - kb.length;
+    });
+}
+
+/**
+ * Option labels that draw the folder tree like the `tree` command:
+ * subfolders hang off their parent with ├─ and └─, and │ continues a parent's
+ * line past its subfolders. Top-level folders stay flush left.
+ */
+function folderTreeLabels(paths) {
+    let parentOf = path => path.split("/").slice(0, -1).join("/");
+    let lastChild = new Map();  // parent path -> its last subfolder in tree order
+    for (let path of paths) {
+        if (path) {
+            lastChild.set(parentOf(path), path);
+        }
+    }
+    let isLast = path => lastChild.get(parentOf(path)) === path;
+    let labels = new Map([["", "(Top level)"]]);
+    for (let path of paths) {
+        let parts = path.split("/");
+        if (!path) {
+            continue;
+        }
+        let prefix = "";
+        // One column per ancestor below the top-level folder
+        for (let depth = 2; depth < parts.length; depth++) {
+            let ancestor = parts.slice(0, depth).join("/");
+            prefix += isLast(ancestor) ? "\u00a0\u00a0\u00a0" : "│\u00a0\u00a0";
+        }
+        if (parts.length > 1) {
+            prefix += isLast(path) ? "└─\u00a0" : "├─\u00a0";
+        }
+        labels.set(path, prefix + parts[parts.length - 1]);
+    }
+    return labels;
+}
+
+function folderOption(path, label) {
+    let element = option(path, label, path === LIBRARY_FOLDER);
+    element.title = path || "Top level";
+    return element;
+}
+
+function renderLibrary() {
+    let paths = libraryFolderPaths();
+    if (!paths.includes(LIBRARY_FOLDER)) {
+        // Start in the first folder that has macros rather than the top level
+        let first = LIBRARY.find(f => f.folder) || LIBRARY[0];
+        LIBRARY_FOLDER = first ? first.folder : null;
+    }
+    let labels = folderTreeLabels(paths);
+    HTML_LIBRARY_FOLDERS.replaceChildren(...paths.map(path => folderOption(path, labels.get(path))));
+    let folder = LIBRARY.find(f => f.folder === LIBRARY_FOLDER);
+    let macros = folder ? folder.macros : [];
     let groups = [option("", "Choose a macro…", !LIBRARY_MACRO)];
     for (let [source, label] of [["builtin", "Built-in"], ["user", "Personal"]]) {
         let matching = macros.filter(m => m.source === source);
@@ -952,27 +1015,27 @@ function renderLibrary() {
     HTML_LIBRARY_MACROS.replaceChildren(...groups);
 }
 
-function selectLibraryGame(game) {
-    LIBRARY_GAME = game;
+function selectLibraryFolder(folder) {
+    LIBRARY_FOLDER = folder;
     newLibraryMacro();
 }
 
 function selectLibraryMacro(name) {
     if (name) {
-        socket.emit('library_get', JSON.stringify([LIBRARY_GAME, name]));
+        socket.emit('library_get', JSON.stringify([LIBRARY_FOLDER, name]));
     } else {
         newLibraryMacro();
     }
 }
 
 function showLibraryMacro(macro) {
-    LIBRARY_GAME = macro.game;
+    LIBRARY_FOLDER = macro.folder;
     LIBRARY_MACRO = macro.name;
     renderLibrary();
-    HTML_LIBRARY_GAME.value = macro.game;
+    HTML_LIBRARY_FOLDER.value = macro.folder;
     HTML_LIBRARY_NAME.value = macro.name;
     HTML_LIBRARY_TEXT.value = macro.text;
-    let entry = (LIBRARY.find(g => g.game === macro.game) || {macros: []})
+    let entry = (LIBRARY.find(f => f.folder === macro.folder) || {macros: []})
         .macros.find(m => m.name === macro.name) || {};
     HTML_LIBRARY_INFO.replaceChildren();
     for (let [label, value] of [["", entry.description], ["Before you start: ", entry.setup]]) {
@@ -1004,15 +1067,15 @@ function runLibraryMacro() {
 function saveLibraryMacro() {
     LIBRARY_SAVING = true;
     socket.emit('library_save', JSON.stringify(
-        [HTML_LIBRARY_GAME.value.trim(), HTML_LIBRARY_NAME.value.trim(), HTML_LIBRARY_TEXT.value]
+        [HTML_LIBRARY_FOLDER.value.trim(), HTML_LIBRARY_NAME.value.trim(), HTML_LIBRARY_TEXT.value]
     ));
 }
 
 function deleteLibraryMacro() {
-    let game = HTML_LIBRARY_GAME.value.trim();
+    let folder = HTML_LIBRARY_FOLDER.value.trim();
     let name = HTML_LIBRARY_NAME.value.trim();
-    if (confirm(`Delete "${name}" from ${game}?`)) {
-        socket.emit('library_delete', JSON.stringify([game, name]));
+    if (confirm(`Delete "${name}" from ${folder || "the top level"}?`)) {
+        socket.emit('library_delete', JSON.stringify([folder, name]));
         newLibraryMacro();
     }
 }
@@ -1020,7 +1083,7 @@ function deleteLibraryMacro() {
 function newLibraryMacro() {
     LIBRARY_MACRO = null;
     renderLibrary();
-    HTML_LIBRARY_GAME.value = LIBRARY_GAME || "";
+    HTML_LIBRARY_FOLDER.value = LIBRARY_FOLDER || "";
     HTML_LIBRARY_NAME.value = "";
     HTML_LIBRARY_TEXT.value = "";
     HTML_LIBRARY_INFO.replaceChildren();

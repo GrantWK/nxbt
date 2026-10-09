@@ -85,7 +85,7 @@ def test_huge_loops_are_not_expanded_in_memory():
 
 
 def test_library_macros_parse():
-    for path in BUILTIN_DIR.glob("*/*.txt"):
+    for path in BUILTIN_DIR.rglob("*.txt"):
         assert parse_macro(path.read_text(encoding="utf-8")), path.name
 
 

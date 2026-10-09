@@ -1,9 +1,11 @@
-"""Macro library: built-in example macros plus the user's own, grouped by game.
+"""Macro library: built-in example macros plus the user's own, in folders.
 
 Each macro is a text file in nxbt's macro language (see docs/Macros.md) stored
-at ``<root>/<game>/<name>.txt``; the file name is the macro's title. Built-in
+at ``<root>/<folder>/<name>.txt``; the file name is the macro's title. A folder
+is a ``/``-separated path up to ``MAX_FOLDER_DEPTH`` levels deep (for example
+``Pokémon Legends Z-A/Wild zones``), or ``""`` for the top level. Built-in
 macros ship with nxbt and are read-only; user macros live in the user's data
-folder and take precedence when a name matches a built-in one.
+folder and take precedence when a folder and name match a built-in one.
 
 A macro starts with ``#`` comment lines shown in the web UI::
 
@@ -19,6 +21,7 @@ from ..controller.macro import parse_macro
 
 BUILTIN_DIR = Path(__file__).parent / "builtin"
 MAX_MACRO_BYTES = 256 * 1024
+MAX_FOLDER_DEPTH = 4
 # Letters, digits and a few punctuation marks; no slashes, no leading dot
 _SAFE_NAME = re.compile(r"^\w[\w &'(),.+-]{0,63}$")
 
@@ -61,69 +64,103 @@ def _give_to_invoking_user(path):
         os.chown(path, int(uid), int(gid))
 
 
+_NAME_RULE = "1-64 letters, digits, spaces or & ' ( ) , . + -"
+
+
+def _check_name(label, value):
+    if not isinstance(value, str) or not _SAFE_NAME.match(value):
+        raise ValueError(f"{label} must be {_NAME_RULE}")
+
+
+def normalize_folder(folder):
+    """Checks a ``/``-separated folder path and returns it tidied: spaces
+    around each ``/`` and leading or trailing slashes removed. ``""`` is the
+    top level."""
+    if not isinstance(folder, str):
+        raise ValueError("Folder must be text")
+    parts = [part.strip() for part in folder.strip().strip("/").split("/")]
+    if parts == [""]:
+        return ""
+    if len(parts) > MAX_FOLDER_DEPTH:
+        raise ValueError(f"Folders can be at most {MAX_FOLDER_DEPTH} levels deep")
+    for part in parts:
+        _check_name("Each folder name", part)
+    return "/".join(parts)
+
+
 class Library:
     def __init__(self, user_dir=None, builtin_dir=BUILTIN_DIR):
         self.user_dir = Path(user_dir) if user_dir else user_library_dir()
         self.builtin_dir = Path(builtin_dir)
 
     def list(self):
-        """Games and their macros, sorted by name:
-        ``[{"game", "macros": [{"name", "source", "description", "setup"}]}]``."""
-        games = {}
+        """Folders that hold macros and their macros, sorted by path, the top
+        level (``""``) first:
+        ``[{"folder", "macros": [{"name", "source", "description", "setup"}]}]``."""
+        folders = {}
         # User macros are read last so they replace built-ins of the same name
         for source, root in (("builtin", self.builtin_dir), ("user", self.user_dir)):
             if not root.is_dir():
                 continue
-            for path in root.glob("*/*.txt"):
+            for path in root.rglob("*.txt"):
+                parts = path.relative_to(root).parent.parts
+                if len(parts) > MAX_FOLDER_DEPTH or any(p.startswith(".") for p in parts):
+                    continue
                 text = path.read_text(encoding="utf-8", errors="replace")
                 description, setup = read_header(text)
-                games.setdefault(path.parent.name, {})[path.stem] = {
+                folders.setdefault("/".join(parts), {})[path.stem] = {
                     "name": path.stem,
                     "source": source,
                     "description": description,
                     "setup": setup,
                 }
         return [
-            {"game": game, "macros": sorted(macros.values(), key=lambda m: m["name"].lower())}
-            for game, macros in sorted(games.items(), key=lambda g: g[0].lower())
+            {"folder": folder, "macros": sorted(macros.values(), key=lambda m: m["name"].lower())}
+            for folder, macros in sorted(
+                folders.items(), key=lambda f: [p.lower() for p in f[0].split("/") if p]
+            )
         ]
 
-    def get(self, game, name):
+    def get(self, folder, name):
         """The macro's text and source. Raises FileNotFoundError if missing."""
+        folder = normalize_folder(folder)
         for source, root in (("user", self.user_dir), ("builtin", self.builtin_dir)):
-            path = self._path(root, game, name)
+            path = self._path(root, folder, name)
             if path.is_file():
                 text = path.read_text(encoding="utf-8")
-                return {"game": game, "name": name, "source": source, "text": text}
-        raise FileNotFoundError(f"No macro {name!r} for {game!r}")
+                return {"folder": folder, "name": name, "source": source, "text": text}
+        raise FileNotFoundError(f"No macro {name!r} in {folder or 'the top level'!r}")
 
-    def save(self, game, name, text):
-        """Saves a user macro, replacing any with the same game and name."""
+    def save(self, folder, name, text):
+        """Saves a user macro, replacing any with the same folder and name.
+        Returns the normalized folder."""
         if len(text.encode("utf-8")) > MAX_MACRO_BYTES:
             raise ValueError(f"Macro is larger than {MAX_MACRO_BYTES // 1024} KB")
         parse_macro(text)  # raises ValueError naming the bad line
-        path = self._path(self.user_dir, game, name)
+        folder = normalize_folder(folder)
+        path = self._path(self.user_dir, folder, name)
         self._makedirs(path.parent)
         path.write_text(text, encoding="utf-8")
         _give_to_invoking_user(path)
+        return folder
 
-    def delete(self, game, name):
-        """Deletes a user macro. Built-in macros can't be deleted."""
-        path = self._path(self.user_dir, game, name)
+    def delete(self, folder, name):
+        """Deletes a user macro and any folders it leaves empty. Built-in
+        macros can't be deleted."""
+        folder = normalize_folder(folder)
+        path = self._path(self.user_dir, folder, name)
         if not path.is_file():
-            raise FileNotFoundError(f"No saved macro {name!r} for {game!r}")
+            raise FileNotFoundError(f"No saved macro {name!r} in {folder or 'the top level'!r}")
         path.unlink()
-        if not any(path.parent.iterdir()):
-            path.parent.rmdir()
+        directory = path.parent
+        while directory != self.user_dir and not any(directory.iterdir()):
+            directory.rmdir()
+            directory = directory.parent
 
     @staticmethod
-    def _path(root, game, name):
-        for label, value in (("Game", game), ("Macro name", name)):
-            if not isinstance(value, str) or not _SAFE_NAME.match(value):
-                raise ValueError(
-                    f"{label} must be 1-64 letters, digits, spaces or & ' ( ) , . + -"
-                )
-        return root / game / f"{name}.txt"
+    def _path(root, folder, name):
+        _check_name("Macro name", name)
+        return root.joinpath(*folder.split("/") if folder else (), f"{name}.txt")
 
     def _makedirs(self, directory):
         """Creates missing folders one level at a time so each new one can be
