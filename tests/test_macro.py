@@ -28,8 +28,8 @@ def test_loop_repeats_body():
 
 
 def test_nested_and_sequential_loops():
-    text = "LOOP 2\n    A 1s\n    LOOP 2\n        B 1s\nLOOP 1\n    C 1s\n"
-    assert steps(text) == ["A 1s", "B 1s", "B 1s", "A 1s", "B 1s", "B 1s", "C 1s"]
+    text = "LOOP 2\n    A 1s\n    LOOP 2\n        B 1s\nLOOP 1\n    X 1s\n"
+    assert steps(text) == ["A 1s", "B 1s", "B 1s", "A 1s", "B 1s", "B 1s", "X 1s"]
 
 
 @pytest.mark.parametrize("indent", ["\t", "  ", "    "])
@@ -50,10 +50,10 @@ def test_forever_with_only_empty_inner_loop_ends():
 
 
 def test_loop_forever_repeats_until_stopped():
-    cursor = parse_macro("START 1s\nLOOP FOREVER\n    A 0.4s\n    0.05s\n")
+    cursor = parse_macro("HOME 1s\nLOOP FOREVER\n    A 0.4s\n    0.05s\n")
     assert cursor.remaining is None
     produced = [cursor.pop() for _ in range(1001)]
-    assert produced[0] == "START 1s"
+    assert produced[0] == "HOME 1s"
     assert produced[1:] == ["A 0.4s", "0.05s"] * 500
     assert cursor.pop() is not None  # still going
 
@@ -72,7 +72,7 @@ def test_invalid_loop_counts_raise(line):
 
 
 def test_huge_loops_are_not_expanded_in_memory():
-    body = "".join(f"    STEP{i} 0.1s\n" for i in range(14))
+    body = "".join(f"    A {i + 1}s\n" for i in range(14))
     tracemalloc.start()
     cursor = parse_macro("5s\nLOOP 100000\n" + body)
     first = list(islice(iter(cursor.pop, None), 3))
@@ -80,7 +80,7 @@ def test_huge_loops_are_not_expanded_in_memory():
     tracemalloc.stop()
 
     assert cursor.remaining == 1_400_001 - 3
-    assert first == ["5s", "STEP0 0.1s", "STEP1 0.1s"]
+    assert first == ["5s", "A 1s", "A 2s"]
     assert peak < 200_000  # was ~22 MB when loops were expanded
 
 
@@ -136,14 +136,14 @@ def test_timed_loop_lengths(text, seconds):
 
 def test_timed_loop_finishes_the_repeat_it_started():
     clock = FakeClock()
-    cursor = parse_macro("LOOP 10s\n    A 3s\n    B 3s\nDONE 0.1s\n", clock)
+    cursor = parse_macro("LOOP 10s\n    A 3s\n    B 3s\nY 0.1s\n", clock)
     produced = []
     while (step := cursor.pop()) is not None:
         produced.append(step)
         clock.now += float(step.split()[-1][:-1])  # each step takes its time
 
     # Repeats start at 0 s and 6 s; the third would start at 12 s > 10 s
-    assert produced == ["A 3s", "B 3s", "A 3s", "B 3s", "DONE 0.1s"]
+    assert produced == ["A 3s", "B 3s", "A 3s", "B 3s", "Y 0.1s"]
     assert cursor.remaining is None
 
 
@@ -171,3 +171,32 @@ def test_status_reports_time_left_for_timed_loops():
     status = parser.macro_status()
     assert status["steps_left"] is None
     assert 1790 < status["time_left"] <= 1800
+
+
+def test_step_without_time_uses_default():
+    assert steps("HOME\nA L_STICK@+000+100\n0.5s\n") == [
+        "HOME 0.1s", "A L_STICK@+000+100 0.1s", "0.5s",
+    ]
+
+
+def test_steps_are_normalized_to_uppercase():
+    assert steps("a 0.2S\nloop 2\n    dpad_up\n") == ["A 0.2s", "DPAD_UP 0.1s", "DPAD_UP 0.1s"]
+
+
+@pytest.mark.parametrize("text, line", [
+    ("HOM\n", 1),  # typo
+    ("A\nB 0.1x\n", 2),  # bad time
+    ("# comment\n\nL_STICK@+150+000\n", 3),  # stick out of range
+    ("A\nLOOP 2\n    B\n    Q 1s\n", 4),  # error inside a loop
+])
+def test_invalid_steps_name_their_line(text, line):
+    with pytest.raises(ValueError, match=f"^Line {line}: "):
+        parse_macro(text)
+
+
+def test_bare_step_is_skipped_not_crashing_when_invalid():
+    parser = make_parser()
+    state = {"finished_macros": []}
+    parser.buffer_macro("HOM\nA\n", "bad")
+    parser.set_protocol_input(state)
+    assert state["finished_macros"] == ["bad"]
