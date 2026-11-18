@@ -124,7 +124,11 @@ class ControllerProtocol:
             self.colour_buttons = colour_buttons
 
     def get_report(self):
-        report = bytes(self.report)
+        # Mask each slot to a single byte so a value the parser missed clamping (negative, or out of
+        # 0..255) truncates to its low 8 bits instead of raising ValueError from bytes(). Crashing the
+        # controller server here drops the Switch's BT link mid-input; a hardware Pro Controller
+        # behaves like this mask, so we lose nothing by matching it.
+        report = bytes((b & 0xFF) if isinstance(b, int) else 0 for b in self.report)
         # Clear report
         self.set_empty_report()
         return report
