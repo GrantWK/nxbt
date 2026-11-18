@@ -174,6 +174,13 @@ class ControllerServer:
                     self.logger.debug(format_msg_switch(reply))
             except BlockingIOError:
                 reply = None
+            except (ConnectionResetError, ConnectionAbortedError, OSError) as e:
+                # Switch tore down the link (sleep, menu change, overload under mixed input). The
+                # sendall() branch below already routes OSError into save_connection(); mirror that on
+                # the read side so a one-sided drop recovers transparently instead of crashing the
+                # controller server and forcing a Change-Grip re-pair.
+                itr, ctrl = self.save_connection(e)
+                reply = None
 
             # Getting any inputs from the task queue
             if self.task_queue:
